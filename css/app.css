@@ -1,0 +1,113 @@
+/* Mihrap web. Written for old TV browsers too: no CSS variables, no grid, prefixed flexbox. */
+@font-face { font-family: "Amiri"; src: url("../fonts/amiri_regular.ttf") format("truetype"); }
+@font-face { font-family: "MihrapSerif"; src: url("../fonts/noto_serif_regular.ttf") format("truetype"); }
+
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+body { font-family: "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif; -webkit-user-select: none; user-select: none; cursor: default; }
+button { font-family: inherit; }
+
+/* Fixed 1920x1080 stage, scaled to the screen by app.js. */
+#stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; background: #f6efe2;
+  -webkit-transform-origin: 0 0; transform-origin: 0 0; }
+.screen, .layer { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+.hidden { display: none !important; }
+.flex { display: -webkit-box; display: -webkit-flex; display: flex; }
+
+/* Focus ring for the remote */
+.nav { outline: none; }
+.nav:focus, .nav.focus { box-shadow: 0 0 0 6px #e0a526, 0 0 22px 6px rgba(224,165,38,.75); z-index: 2; }
+
+/* ---------- Home ---------- */
+#home { background: #f6efe2; color: #2b2116; }
+#placeLine { position: absolute; left: 70px; top: 34px; font-size: 30px; color: #7a6a52; letter-spacing: 1px; }
+.gear { position: absolute; right: 50px; top: 22px; width: 84px; height: 84px; border-radius: 42px; border: 3px solid #c4a05a;
+  background: #fffaf0; color: #8a6a2a; font-size: 50px; line-height: 70px; padding: 0; cursor: pointer; }
+.topRow { position: absolute; left: 0; top: 120px; width: 1920px; height: 540px;
+  display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
+.medallion { width: 330px; height: 330px; border-radius: 50%; margin: 0 50px; position: relative;
+  background: radial-gradient(circle at 50% 45%, #1f5a4c 0%, #123b31 62%, #0c2b24 100%);
+  border: 14px solid #c9a24f; box-shadow: 0 0 0 4px #8a6a2a, inset 0 0 0 6px #0c2b24, inset 0 0 0 9px #c9a24f, 0 14px 30px rgba(80,60,20,.35);
+  display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
+.medallion span { font-family: "Amiri", serif; color: #e8c46a; font-size: 120px; line-height: 1; padding-bottom: 20px;
+  text-shadow: 0 2px 0 #6e5320; direction: rtl; }
+#clockCard { width: 900px; height: 500px; background: #fffcf7; border: 2px solid #e6d6b4; border-radius: 26px; text-align: center;
+  box-shadow: 0 10px 30px rgba(120,90,40,.12); }
+#clock { font-family: Georgia, "Times New Roman", serif; font-weight: bold; font-size: 260px; line-height: 300px; margin-top: 20px; color: #2b2116; letter-spacing: 6px; }
+.rule { width: 360px; height: 3px; background: #c9a24f; margin: 6px auto 22px; }
+#dateLine { font-size: 40px; color: #6a5a44; }
+#eventLine { font-size: 36px; color: #a8741a; font-weight: bold; margin-top: 12px; }
+.bottomRow { position: absolute; left: 0; top: 700px; width: 1920px; height: 300px;
+  display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
+#cards { display: -webkit-box; display: -webkit-flex; display: flex; }
+.card { width: 218px; height: 250px; margin: 0 9px; background: #fffcf7; border: 2px solid #e6d6b4; border-radius: 20px; text-align: center;
+  box-shadow: 0 6px 18px rgba(120,90,40,.10); }
+.card .t { font-size: 72px; font-weight: bold; margin-top: 52px; color: #2b2116; font-family: Georgia, serif; }
+.card .n { font-size: 34px; margin-top: 16px; color: #6a5a44; letter-spacing: 2px; }
+.card.active { background: #3d6e64; border-color: #c9a24f; }
+.card.active .t, .card.active .n { color: #fff; }
+#disc { width: 250px; height: 250px; border-radius: 50%; margin-left: 30px; background: #f3d98a; border: 8px solid #c4a05a; color: #5a3a08;
+  text-align: center; box-sizing: border-box; }
+#discTitle { font-size: 34px; font-weight: bold; margin-top: 62px; }
+#discValue { font-size: 60px; font-weight: bold; margin-top: 6px; white-space: pre-line; line-height: 1.05; }
+#homeMessage { position: absolute; left: 0; top: 1020px; width: 1920px; text-align: center; font-size: 30px; color: #9a3a2a; }
+
+/* ---------- Screensaver ---------- */
+#saver { background: #000; }
+#saver canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; opacity: 0;
+  -webkit-transition: opacity 1.6s ease; transition: opacity 1.6s ease; }
+#saver canvas.on { opacity: 1; }
+#saverStrip { position: absolute; left: 0; top: 960px; width: 1920px; height: 120px; background: rgba(10,14,20,.55); color: #fff;
+  display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
+#saverClock { width: 470px; padding-left: 50px; font-size: 30px; white-space: nowrap; overflow: hidden; }
+#saverClock b { font-size: 62px; margin-right: 16px; font-family: Georgia, serif; }
+#saverTimes { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; text-align: center; white-space: nowrap; }
+#saverTimes span { display: inline-block; vertical-align: middle; margin: 0 6px; min-width: 120px; font-size: 22px; padding: 6px 12px;
+  border-radius: 12px; color: #f3ead6; text-align: center; }
+#saverTimes span b { display: block; font-size: 40px; color: #fff; font-family: Georgia, serif; }
+#saverTimes span.active { background: rgba(61,110,100,.9); }
+#saverNext { width: 420px; padding-right: 50px; text-align: right; font-size: 30px; color: #f3d98a; white-space: nowrap; }
+#saverNext b { font-size: 48px; margin: 0 12px; }
+
+/* ---------- Settings ---------- */
+#settings { background: #f6efe2; color: #2b2116; }
+#settings h1 { margin: 0; padding: 34px 70px 10px; font-size: 54px; color: #3d6e64; }
+#settingsBody { position: absolute; left: 70px; top: 120px; width: 1780px; height: 800px; overflow: hidden; }
+.row { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  margin: 0 0 14px; min-height: 76px; }
+.row .label { width: 470px; font-size: 32px; color: #5a4a34; padding-right: 20px; }
+.row .opts { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; }
+.opt { font-size: 30px; padding: 12px 24px; margin: 5px 10px 5px 0; border-radius: 14px; border: 2px solid #d9c59a; background: #fffcf7; color: #2b2116; cursor: pointer; }
+.opt.sel { background: #3d6e64; color: #fff; border-color: #3d6e64; }
+.note { font-size: 26px; color: #7a6a52; margin: -6px 0 14px 470px; }
+.settingsButtons { position: absolute; left: 70px; top: 950px; }
+.big { font-size: 36px; padding: 18px 44px; margin-right: 24px; border-radius: 18px; border: 3px solid #c4a05a; background: #fffcf7; color: #2b2116; cursor: pointer; }
+.big.danger { border-color: #b5523e; color: #9a3a2a; }
+.big.danger.armed { background: #b5523e; color: #fff; }
+.big.primary { background: #3d6e64; border-color: #3d6e64; color: #fff; }
+
+/* ---------- Picker / credits ---------- */
+#picker, #credits { background: rgba(20,20,20,.55); }
+.pickerBox, .creditsBox { position: absolute; left: 360px; top: 60px; width: 1200px; height: 960px; background: #fffcf7; border-radius: 26px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+.pickerBox h2, .creditsBox h2 { margin: 0; padding: 30px 40px 16px; font-size: 44px; color: #3d6e64; }
+#pickerList { position: absolute; left: 40px; top: 110px; width: 1120px; height: 820px; overflow: hidden; }
+#pickerList .opt { display: block; width: 1080px; text-align: left; margin: 0 0 10px; }
+#creditsList { position: absolute; left: 40px; top: 110px; width: 1120px; height: 720px; overflow: hidden; font-size: 22px; color: #3a3226; }
+#creditsList p { margin: 0 0 10px; }
+#creditsList p.nav:focus { box-shadow: none; background: #f3e6c4; }
+#closeCredits { position: absolute; left: 40px; top: 860px; }
+
+/* ---------- Adhan / start ---------- */
+#adhan { background: rgba(8,30,26,.97); color: #fff; }
+.adhanBox, .startBox { position: absolute; left: 0; top: 300px; width: 1920px; text-align: center; }
+#adhanName { font-size: 110px; font-weight: bold; color: #f3d98a; }
+#adhanTime { font-size: 60px; margin: 20px 0 60px; }
+#start { background: #0f3a31; color: #fff; }
+.startLogo { font-family: "Amiri", Georgia, serif; font-size: 150px; color: #e8c46a; margin-bottom: 50px; }
+#startHint { font-size: 36px; margin-top: 50px; color: #d9e6df; }
+#startButton { font-size: 56px; padding: 26px 90px; }
+
+[dir="rtl"] { direction: rtl; }

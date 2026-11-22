@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mihrap</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/app.css?v=4">
+</head>
+<body>
+<div id="stage">
+
+  <!-- Home: Board theme -->
+  <div id="home" class="screen">
+    <div id="placeLine"></div>
+    <button id="openSettings" class="nav gear" aria-label="Ayarlar">&#9881;</button>
+    <div class="topRow">
+      <div class="medallion"><span id="medAllah"></span></div>
+      <div id="clockCard">
+        <div id="clock">--:--</div>
+        <div class="rule"></div>
+        <div id="dateLine"></div>
+        <div id="eventLine"></div>
+      </div>
+      <div class="medallion"><span id="medMuhammad"></span></div>
+    </div>
+    <div class="bottomRow">
+      <div id="cards"></div>
+      <div id="disc"><div id="discTitle"></div><div id="discValue">--</div></div>
+    </div>
+    <div id="homeMessage"></div>
+  </div>
+
+  <!-- Screensaver -->
+  <div id="saver" class="screen hidden">
+    <canvas id="slideA" width="1920" height="1080"></canvas>
+    <canvas id="slideB" width="1920" height="1080"></canvas>
+    <div id="saverStrip">
+      <div id="saverClock"></div>
+      <div id="saverTimes"></div>
+      <div id="saverNext"></div>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div id="settings" class="screen hidden">
+    <h1 id="settingsTitle"></h1>
+    <div id="settingsBody"></div>
+    <div class="settingsButtons">
+      <button id="saveSettings" class="nav big primary"></button>
+      <button id="cancelSettings" class="nav big"></button>
+      <button id="openCredits" class="nav big"></button>
+      <button id="resetSettings" class="nav big danger"></button>
+    </div>
+  </div>
+
+  <!-- Picker (long lists: countries, cities, districts) -->
+  <div id="picker" class="layer hidden">
+    <div class="pickerBox">
+      <h2 id="pickerTitle"></h2>
+      <div id="pickerList"></div>
+    </div>
+  </div>
+
+  <!-- Credits -->
+  <div id="credits" class="layer hidden">
+    <div class="creditsBox">
+      <h2 id="creditsTitle"></h2>
+      <div id="creditsList"></div>
+      <button id="closeCredits" class="nav big"></button>
+    </div>
+  </div>
+
+  <!-- Adhan playing -->
+  <div id="adhan" class="layer hidden">
+    <div class="adhanBox">
+      <div id="adhanName"></div>
+      <div id="adhanTime"></div>
+      <button id="stopAdhan" class="nav big primary"></button>
+    </div>
+  </div>
+
+  <!-- Start: one press unlocks sound in the TV browser -->
+  <div id="start" class="layer">
+    <div class="startBox">
+      <div class="startLogo">Mihrap</div>
+      <button id="startButton" class="nav big primary">Başlat</button>
+      <div id="startHint"></div>
+    </div>
+  </div>
+</div>
+
+<audio id="player" preload="none"></audio>
+<script src="data/config.js?v=4"></script>
+<script src="js/app.js?v=4"></script>
+</body>
+</html>
