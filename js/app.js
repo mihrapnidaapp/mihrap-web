@@ -194,8 +194,30 @@
   }
 
   // ------------------------------------------------------------------ computed times (CalculatedTimes)
+  // {fajr angle, isha angle or -minutes after maghrib, maghrib angle or 0 for sunset, options}.
+  // Options: minute adjustments (sunrise, dhuhr, asr, maghrib; dhuhr defaults to +1) and moon = the
+  // Moonsighting Committee's seasonal Fajr/Isha limits. Values as published by each authority
+  // (and as used by the adhan / aladhan libraries).
   var METHODS = { mwl: [18.0, 17.0, 0.0], isna: [15.0, 15.0, 0.0], egypt: [19.5, 17.5, 0.0], makkah: [18.5, -90.0, 0.0],
-    karachi: [18.0, 18.0, 0.0], tehran: [17.7, 14.0, 4.5] };
+    karachi: [18.0, 18.0, 0.0], tehran: [17.7, 14.0, 4.5],
+    jakim: [20.0, 18.0, 0.0], kemenag: [20.0, 18.0, 0.0], muis: [20.0, 18.0, 0.0], uoif: [12.0, 12.0, 0.0],
+    kuwait: [18.0, 17.5, 0.0], qatar: [18.0, -90.0, 0.0],
+    dubai: [18.2, 18.2, 0.0, { sunrise: -3, dhuhr: 3, asr: 3, maghrib: 3 }],
+    moonsighting: [18.0, 18.0, 0.0, { dhuhr: 5, maghrib: 3, moon: true }] };
+  var CALC_ORDER = ["diyanet", "mwl", "isna", "egypt", "makkah", "karachi", "tehran", "jakim", "kemenag", "muis", "uoif",
+    "kuwait", "qatar", "dubai", "moonsighting"];
+  // Names of the methods the Android strings do not have (Turkish; English elsewhere).
+  var CALC_NAMES = {
+    tr: { jakim: "JAKIM (Malezya)", kemenag: "Kemenag (Endonezya)", muis: "MUIS (Singapur)", uoif: "UOIF (Fransa)", kuwait: "Kuveyt",
+      qatar: "Katar", dubai: "Dubai", moonsighting: "Moonsighting Committee" },
+    en: { jakim: "JAKIM (Malaysia)", kemenag: "Kemenag (Indonesia)", muis: "MUIS (Singapore)", uoif: "UOIF (France)", kuwait: "Kuwait",
+      qatar: "Qatar", dubai: "Dubai", moonsighting: "Moonsighting Committee" }
+  };
+  function calcName(id) {
+    var own = S("calc_" + id);
+    if (own) return own;
+    return (CALC_NAMES[settings.lang] || CALC_NAMES.en)[id] || id;
+  }
   var computedCache = { key: "", rows: null };
   var geocoding = false;
 
@@ -252,16 +274,56 @@
     t = sunTimes(jd, lat, refined, m, asrFactor);
     for (i = 0; i < t.length; ++i) t[i] += tz - lon / 15.0;
     var fajr = t[0], sunrise = t[1], dhuhr = t[2], asr = t[3], sunset = t[4], maghrib = t[5], isha = t[6];
+    var o = m[3] || {};
     if (m[1] < 0) isha = maghrib - m[1] / 60.0;
     var night = 24.0 - (sunset - sunrise);
-    var fajrPortion = m[0] / 60.0 * night;
-    if (isNaN(fajr) || sunrise - fajr > fajrPortion) fajr = sunrise - fajrPortion;
-    if (m[1] > 0) {
-      var ishaPortion = m[1] / 60.0 * night;
-      if (isNaN(isha) || isha - sunset > ishaPortion) isha = sunset + ishaPortion;
+    if (o.moon) {
+      // Moonsighting Committee: Fajr no earlier and Isha no later than the seasonal limits; above 55°
+      // a seventh of the night.
+      var doy = dayOfYear(y, mo, d);
+      if (Math.abs(lat) >= 55) {
+        fajr = sunrise - night / 7;
+        isha = sunset + night / 7;
+      } else {
+        var safeFajr = sunrise - seasonalMinutes(lat, doy, y, true) / 60;
+        var safeIsha = sunset + seasonalMinutes(lat, doy, y, false) / 60;
+        if (isNaN(fajr) || safeFajr > fajr) fajr = safeFajr;
+        if (isNaN(isha) || safeIsha < isha) isha = safeIsha;
+      }
+    } else {
+      var fajrPortion = m[0] / 60.0 * night;
+      if (isNaN(fajr) || sunrise - fajr > fajrPortion) fajr = sunrise - fajrPortion;
+      if (m[1] > 0) {
+        var ishaPortion = m[1] / 60.0 * night;
+        if (isNaN(isha) || isha - sunset > ishaPortion) isha = sunset + ishaPortion;
+      }
     }
-    dhuhr += 1.0 / 60.0;
+    dhuhr += (o.dhuhr !== undefined ? o.dhuhr : 1) / 60.0;
+    sunrise += (o.sunrise || 0) / 60.0;
+    asr += (o.asr || 0) / 60.0;
+    maghrib += (o.maghrib || 0) / 60.0;
     return [hm(fajr), hm(sunrise), hm(dhuhr), hm(asr), hm(maghrib), hm(isha)];
+  }
+  function dayOfYear(y, mo, d) {
+    return Math.round((Date.UTC(y, mo - 1, d) - Date.UTC(y, 0, 1)) / 86400000) + 1;
+  }
+  // Khalid Shaukat's seasonal twilight (minutes before sunrise / after sunset), general shafaq.
+  function seasonalMinutes(lat, doy, year, morning) {
+    var l = Math.abs(lat);
+    var a, b, c, dd;
+    if (morning) { a = 75 + 28.65 / 55 * l; b = 75 + 19.44 / 55 * l; c = 75 + 32.74 / 55 * l; dd = 75 + 48.10 / 55 * l; }
+    else { a = 75 + 25.60 / 55 * l; b = 75 + 2.050 / 55 * l; c = 75 - 9.21 / 55 * l; dd = 75 + 6.14 / 55 * l; }
+    var leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    var daysInYear = leap ? 366 : 365;
+    var dyy;
+    if (lat >= 0) { dyy = doy + 10; if (dyy >= daysInYear) dyy -= daysInYear; }
+    else { dyy = doy - (leap ? 173 : 172); if (dyy < 0) dyy += daysInYear; }
+    if (dyy < 91) return a + (b - a) / 91 * dyy;
+    if (dyy < 137) return b + (c - b) / 46 * (dyy - 91);
+    if (dyy < 183) return c + (dd - c) / 46 * (dyy - 137);
+    if (dyy < 229) return dd + (c - dd) / 46 * (dyy - 183);
+    if (dyy < 275) return c + (b - c) / 46 * (dyy - 229);
+    return b + (a - b) / 91 * (dyy - 275);
   }
   function coordinates() { return settings.districtId ? load("coords_" + settings.districtId, null) : null; }
 
@@ -2036,8 +2098,9 @@
     body.appendChild(row(S("tesbihat"), choice("tesbihatSet", [1, 2], [S("tesbihat_set1"), S("tesbihat_set2")]),
       S("tesbihat_name_tercuman") + " / " + S("tesbihat_name_ismi_azam")));
     body.appendChild(row(S("reminder_section"), choice("reminder", [true, false], [Wt(W_ON), Wt(W_OFF)]), S("reminder_desc")));
-    body.appendChild(row(S("calc_method_section"), choice("calc", ["diyanet", "mwl", "isna", "egypt", "makkah", "karachi", "tehran"],
-      [S("calc_diyanet"), S("calc_mwl"), S("calc_isna"), S("calc_egypt"), S("calc_makkah"), S("calc_karachi"), S("calc_tehran")]),
+    var calcLabels = [];
+    for (i = 0; i < CALC_ORDER.length; ++i) calcLabels.push(calcName(CALC_ORDER[i]));
+    body.appendChild(row(S("calc_method_section"), choice("calc", CALC_ORDER, calcLabels),
       draft.calc === "diyanet" ? S("calc_source_diyanet") : ""));
     if (draft.calc !== "diyanet") {
       body.appendChild(row(S("asr_method_desc"), choice("asr", ["standard", "hanafi"], [S("asr_evvel"), S("asr_sani")])));
