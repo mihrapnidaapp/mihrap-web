@@ -2376,6 +2376,10 @@
     }
     focusFirst();
     setInterval(tick, 1000);
+    // Installable web app: the service worker lets Chrome offer "Install app / Add to Home screen".
+    if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "127.0.0.1" || location.hostname === "localhost")) {
+      try { navigator.serviceWorker.register("sw.js").then(function () { }, function () { }); } catch (e) { }
+    }
     if (location.hash === "#debug") {
       // Test hooks, only with #debug in the address.
       window.mihrapDebug = { saver: startSaver, pick: nextRandom, tesbihat: toggleTesbihat, adhan: function (k) { playAdhan(k, new Date()); },
