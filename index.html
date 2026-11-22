@@ -5,41 +5,40 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mihrap</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=4">
+<link rel="stylesheet" href="css/app.css?v=6">
 </head>
 <body>
 <div id="stage">
 
-  <!-- Home: Board theme -->
+  <!-- Home: photo layer + everything else drawn like the tablet (MainActivity / SkyHomeView) -->
   <div id="home" class="screen">
-    <div id="placeLine"></div>
-    <button id="openSettings" class="nav gear" aria-label="Ayarlar">&#9881;</button>
-    <div class="topRow">
-      <div class="medallion"><span id="medAllah"></span></div>
-      <div id="clockCard">
-        <div id="clock">--:--</div>
-        <div class="rule"></div>
-        <div id="dateLine"></div>
-        <div id="eventLine"></div>
-      </div>
-      <div class="medallion"><span id="medMuhammad"></span></div>
+    <div id="homePhoto"></div>
+    <canvas id="homeCanvas" width="1920" height="1080"></canvas>
+    <div id="actionRow" class="hidden">
+      <button id="actAdhan" class="nav action"><span class="icon" id="icAdhan"></span><span class="lbl" id="lblAdhan"></span></button>
+      <button id="actSettings" class="nav action"><span class="icon" id="icSettings"></span><span class="lbl" id="lblSettings"></span></button>
     </div>
-    <div class="bottomRow">
-      <div id="cards"></div>
-      <div id="disc"><div id="discTitle"></div><div id="discValue">--</div></div>
-    </div>
-    <div id="homeMessage"></div>
+    <button id="menuToggle" class="nav" aria-label="Menu">&#9654;&#xFE0E;</button>
   </div>
 
-  <!-- Screensaver -->
+  <!-- Screensaver: two slide canvases plus the overlay footer (SkyHomeView.drawSlideDisc) -->
   <div id="saver" class="screen hidden">
     <canvas id="slideA" width="1920" height="1080"></canvas>
     <canvas id="slideB" width="1920" height="1080"></canvas>
-    <div id="saverStrip">
-      <div id="saverClock"></div>
-      <div id="saverTimes"></div>
-      <div id="saverNext"></div>
-    </div>
+    <canvas id="saverOverlay" width="1920" height="1080"></canvas>
+  </div>
+
+  <!-- Adhan: world mosque photos with a caption, as on the tablet -->
+  <div id="adhan" class="layer hidden">
+    <div id="adhanPhoto"></div>
+    <div id="adhanCaption"></div>
+    <button id="adhanStop" class="nav" aria-label="Stop"></button>
+  </div>
+
+  <!-- Reminder overlay (eventOverlay) -->
+  <div id="eventOverlay" class="hidden">
+    <div id="eventTitle"></div>
+    <div id="eventSubtitle"></div>
   </div>
 
   <!-- Settings -->
@@ -58,6 +57,7 @@
   <div id="picker" class="layer hidden">
     <div class="pickerBox">
       <h2 id="pickerTitle"></h2>
+      <div id="pickerLetters"></div>
       <div id="pickerList"></div>
     </div>
   </div>
@@ -71,14 +71,7 @@
     </div>
   </div>
 
-  <!-- Adhan playing -->
-  <div id="adhan" class="layer hidden">
-    <div class="adhanBox">
-      <div id="adhanName"></div>
-      <div id="adhanTime"></div>
-      <button id="stopAdhan" class="nav big primary"></button>
-    </div>
-  </div>
+  <div id="toast" class="hidden"></div>
 
   <!-- Start: one press unlocks sound in the TV browser -->
   <div id="start" class="layer">
@@ -91,7 +84,8 @@
 </div>
 
 <audio id="player" preload="none"></audio>
-<script src="data/config.js?v=4"></script>
-<script src="js/app.js?v=4"></script>
+<audio id="cue" preload="none"></audio>
+<script src="data/config.js?v=6"></script>
+<script src="js/app.js?v=6"></script>
 </body>
 </html>

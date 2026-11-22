@@ -1,17 +1,42 @@
 /* Mihrap web — browser version of the Mihrap tablet app for smart-TV browsers.
  * Plain ES5 on purpose: TV browsers (Tizen, webOS, Vidaa, Android TV) often run old Chromium builds.
- * Ported from the Android sources: PrayerApi, PrayerCalculator, CalculatedTimes, HijriDays,
- * ScreensaverTextRenderer, AdhanHelper (selection and rotation) and the Board home theme.
+ * Ported from the Android sources (1.0.17): PrayerApi, PrayerCalculator, CalculatedTimes, HijriDays,
+ * ScreensaverTextRenderer, SkyHomeView, MosqueMedallionView, ReferenceButtonDrawable, ThemePresets,
+ * SlideTransitions, AdhanHelper, AdhanVisuals and the home/slide/adhan/reminder code of MainActivity.
+ * The stage is 1920x1080 px; one Android dp is 1.5 px (a 1280x720 dp landscape screen).
  */
 (function () {
   "use strict";
 
   var DATA = window.MIHRAP_DATA;
+  var W = 1920, H = 1080, DP = 1.5;
   var KEYS = ["Imsak", "Gunes", "Ogle", "Ikindi", "Aksam", "Yatsi"];
   var LANGS = ["tr", "en", "de", "ar", "fa", "id", "ms", "zh", "ur", "hi"];
   var LANG_NAMES = { tr: "Türkçe", en: "English", de: "Deutsch", ar: "العربية", fa: "فارسی", id: "Bahasa Indonesia",
     ms: "Bahasa Melayu", zh: "中文", ur: "اردو", hi: "हिन्दी" };
   var RTL = { ar: true, fa: true, ur: true };
+
+  var SANS = '"MRoboto", Roboto, "Noto Sans", Arial, sans-serif';
+  var THIN = '"MRobotoThin", "MRoboto", Roboto, sans-serif';
+  var MONO = '"MMono", "Droid Sans Mono", monospace';
+  var SERIF = '"MihrapSerif", "Noto Serif", Georgia, serif';
+
+  // ThemePresets.ALL: layout (1 Classic photo, 2 Pano, 3 Salon, 4 Sky), photo, accent, clock style.
+  var PRESETS = [
+    { name: "theme_medina", layout: 1, photo: 0, accent: "teal", clock: 1 },
+    { name: "theme_kaaba", layout: 1, photo: 1, accent: "gold", clock: 1 },
+    { name: "theme_green_dome", layout: 1, photo: 2, accent: "teal", clock: 2 },
+    { name: "home_layout_2", layout: 2, photo: 0, accent: "teal", clock: 2 },
+    { name: "home_layout_3", layout: 3, photo: 0, accent: "gold", clock: 2 },
+    { name: "theme_sky", layout: 4, photo: 0, accent: "teal", clock: 2 }
+  ];
+  // DashPalette (Pano / Salon).
+  var PALETTES = {
+    teal: { highlight: "#3E6E66", highlightText: "#FFFFFF", nextStroke: "#D4B56A", buttonFill: "#3E6E66", buttonStroke: "#2C4F48", buttonText: "#FFFFFF" },
+    gold: { highlight: "#C4A05A", highlightText: "#2C2418", nextStroke: "#E8D5A0", buttonFill: "#C4A05A", buttonStroke: "#8A6A2E", buttonText: "#2C2418" }
+  };
+  var CHIP_IDLE = "rgba(255,255,255,0.8)", CHIP_IDLE_STROKE = "rgba(196,160,90,0.4)";
+  var GOLD_SOFT = "#F0D78A";
 
   // Web-only texts (the rest come from the Android string resources).
   var WEB = {
@@ -54,10 +79,15 @@
     xhr.ontimeout = function () { if (fail) fail(new Error("timeout")); };
     xhr.send();
   }
+  // Android format strings: %1$s, %2$d, %s, %d.
   function format(template, a, b) {
-    return String(template).replace("%1$s", a).replace("%2$s", b === undefined ? "" : b).replace("%s", a);
+    return String(template).replace(/%1\$[sd]/, a).replace(/%2\$[sd]/, b === undefined ? "" : b).replace(/%[sd]/, a);
   }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function upper(s) { try { return s.toLocaleUpperCase(settings.lang); } catch (e) { return s.toUpperCase(); } }
 
   // ------------------------------------------------------------------ settings
   function defaultLanguage() {
@@ -67,7 +97,7 @@
   }
   var settings = load("settings", null) || {};
   var DEFAULTS = { lang: defaultLanguage(), countryId: "", countryName: "", cityId: "", cityName: "", districtId: "", districtName: "",
-    azan: "turkey", dua: true, calc: "diyanet", asr: "standard", idle: 30, slide: 20, mihrapTr: true };
+    azan: "turkey", dua: true, calc: "diyanet", asr: "standard", idle: 30, slide: 20, mihrapTr: true, theme: 0, reminder: true };
   for (var dk in DEFAULTS) if (DEFAULTS.hasOwnProperty(dk) && settings[dk] === undefined) settings[dk] = DEFAULTS[dk];
 
   function S(key) {
@@ -76,6 +106,8 @@
     return v === undefined ? (DATA.strings.en[key] || "") : v;
   }
   function Wt(i) { return (WEB[settings.lang] || WEB.en)[i]; }
+  function preset() { return PRESETS[settings.theme] || PRESETS[0]; }
+  // On Friday Dhuhr is the Friday prayer everywhere on the home screen.
   function prayerName(key, day) {
     if (key === "Ogle" && day && day.getDay() === 5) return S("prayer_cuma");
     return S("prayer_" + key);
@@ -86,8 +118,8 @@
     var stage = $("stage");
     var w = window.innerWidth || document.documentElement.clientWidth;
     var h = window.innerHeight || document.documentElement.clientHeight;
-    var scale = Math.min(w / 1920, h / 1080);
-    var left = Math.round((w - 1920 * scale) / 2), top = Math.round((h - 1080 * scale) / 2);
+    var scale = Math.min(w / W, h / H);
+    var left = Math.round((w - W * scale) / 2), top = Math.round((h - H * scale) / 2);
     var t = "translate(" + left + "px," + top + "px) scale(" + scale + ")";
     stage.style.webkitTransform = t;
     stage.style.transform = t;
@@ -137,8 +169,9 @@
       } else {
         fetchError = true;
       }
+      computedCache.key = "";
       if (done) done();
-      render(true);
+      tick(true);
     };
     var fallback = function () {
       getJson("https://ezanvakti.emushaf.net/vakitler/" + encodeURIComponent(district), function (list) { finish(list); }, function () { finish(null); });
@@ -250,7 +283,7 @@
           store("coords_" + district, [parseFloat(list[0].lat), parseFloat(list[0].lon)]);
           geocoding = false;
           computedCache.key = "";
-          render(true);
+          tick(true);
         } else {
           setTimeout(function () { next(i + 1); }, 1100); // Nominatim allows one request per second
         }
@@ -307,6 +340,7 @@
     }
     return null;
   }
+  // The latest prayer whose time has begun. Sunrise is a time marker, not an adhan.
   function activeKey(row, now) {
     if (!row) return "";
     var current = "";
@@ -316,6 +350,10 @@
       if (when && when.getTime() <= now.getTime()) current = KEYS[i];
     }
     return current || "Yatsi"; // after midnight and before Imsak it is still the night's Yatsi
+  }
+  function remainingHms(target, now) {
+    var sec = Math.max(0, Math.floor((target.getTime() - now.getTime()) / 1000));
+    return pad(Math.floor(sec / 3600)) + ":" + pad(Math.floor((sec % 3600) / 60)) + ":" + pad(sec % 60);
   }
 
   // ------------------------------------------------------------------ Hijri (HijriDays)
@@ -411,119 +449,877 @@
     if (m === 12 && d >= 10 && d <= 13) return dayOf(eventText("kurban_bayram"), d - 9);
     return "";
   }
+  // "Day N of Ramadan · Iftar in hh:mm:ss" during the fast, "Imsak in" from sunset until the next fast.
+  function ramadanLine(now) {
+    var todayRow = rowFor(now);
+    var today = hijriParts(todayRow);
+    var nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    var tomorrowRow = rowFor(nextDay);
+    var fastingToday = !!(today && today[1] === 9);
+    var tomorrowParts = hijriParts(tomorrowRow);
+    var fastingTomorrow = !!(tomorrowParts && tomorrowParts[1] === 9);
+    if (!fastingToday && !fastingTomorrow) return "";
+    var imsak = at(todayRow, "Imsak", now), iftar = at(todayRow, "Aksam", now);
+    if (!imsak || !iftar) return "";
+    var head = fastingToday ? format(S("ramadan_day"), today[0]) : S("ramadan_eve");
+    if (fastingToday && now < imsak) return head + "  ·  " + format(S("imsak_in"), remainingHms(imsak, now));
+    if (fastingToday && now < iftar) return head + "  ·  " + format(S("iftar_in"), remainingHms(iftar, now));
+    if (fastingTomorrow && tomorrowRow) {
+      var nextImsak = at(tomorrowRow, "Imsak", nextDay);
+      if (nextImsak) return head + "  ·  " + format(S("imsak_in"), remainingHms(nextImsak, now));
+    }
+    return fastingToday ? head : "";
+  }
+  var KERAHAT_MS = 45 * 60 * 1000;
+  function kerahatLine(row, now) {
+    var sunrise = at(row, "Gunes", now), dhuhr = at(row, "Ogle", now), sunset = at(row, "Aksam", now);
+    if (!sunrise || !dhuhr || !sunset) return "";
+    var t = now.getTime(), end = 0;
+    if (t >= sunrise.getTime() && t < sunrise.getTime() + KERAHAT_MS) end = sunrise.getTime() + KERAHAT_MS;
+    else if (t >= dhuhr.getTime() - KERAHAT_MS && t < dhuhr.getTime()) end = dhuhr.getTime();
+    else if (t >= sunset.getTime() - KERAHAT_MS && t < sunset.getTime()) end = sunset.getTime();
+    if (!end) return "";
+    var e = new Date(end);
+    return format(S("kerahat_until"), pad(e.getHours()) + ":" + pad(e.getMinutes()));
+  }
+  // MainActivity.dateLine: the civil date and the Hijri date, then the blessed day (gold) and kerahat (red).
+  function dateLines(now, civil) {
+    var hijri = hijriText(hijriParts(rowFor(now)));
+    var out = [{ text: hijri ? civil + "  ·  " + hijri : civil }];
+    var event = eventFor(now), ramadan = ramadanLine(now);
+    if (ramadan) out.push({ text: ramadan, color: "#FFD27A", bold: true });
+    if (event) out.push({ text: event, color: "#FFD27A", bold: true });
+    var k = kerahatLine(rowFor(now), now);
+    if (k) out.push({ text: k, color: "#FF9C8A", bold: true });
+    return out;
+  }
+  function civilDash(d) { return pad(d.getDate()) + "-" + pad(d.getMonth() + 1) + "-" + d.getFullYear(); }
 
-  // Civil date like "ÇAR, 28 EKİ" in the menu language (own tables for tr/en/de; Intl otherwise).
+  // "EEE, dd MMM" upper-cased, as the Pano / Salon card shows it.
   var CIVIL = {
     tr: [["PAZ", "PZT", "SAL", "ÇAR", "PER", "CUM", "CMT"], ["OCA", "ŞUB", "MAR", "NİS", "MAY", "HAZ", "TEM", "AĞU", "EYL", "EKİ", "KAS", "ARA"]],
     en: [["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"], ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]],
-    de: [["SO", "MO", "DI", "MI", "DO", "FR", "SA"], ["JAN", "FEB", "MÄR", "APR", "MAI", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEZ"]]
+    de: [["SO.", "MO.", "DI.", "MI.", "DO.", "FR.", "SA."], ["JAN.", "FEB.", "MÄRZ", "APR.", "MAI", "JUNI", "JULI", "AUG.", "SEPT.", "OKT.", "NOV.", "DEZ."]]
   };
-  function civilDate(d) {
+  function civilShort(d) {
     var t = CIVIL[settings.lang];
     if (!t) {
-      try {
-        return d.toLocaleDateString(settings.lang, { weekday: "short", day: "2-digit", month: "short" });
-      } catch (e) { t = CIVIL.en; }
+      try { return upper(d.toLocaleDateString(settings.lang, { weekday: "short", day: "2-digit", month: "short" })); } catch (e) { t = CIVIL.en; }
     }
     return t[0][d.getDay()] + ", " + pad(d.getDate()) + " " + t[1][d.getMonth()];
   }
-
-  // ------------------------------------------------------------------ home rendering
-  var lastMinuteRendered = "";
-  function countdown(next, now) {
-    var sec = Math.max(0, Math.floor((next.when.getTime() - now.getTime()) / 1000));
-    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
-    return h > 0 ? h + ":" + pad(m) : m + " " + S("dash_min");
-  }
-  function untilLabel(key, now) {
+  function dativeUntil(key, now) {
     if (key === "Ogle" && now.getDay() === 5) return S("dash_to_cuma");
     return S("dash_to_" + key);
   }
 
-  function render(force) {
-    var now = new Date();
-    var clock = pad(now.getHours()) + ":" + pad(now.getMinutes());
-    $("clock").innerHTML = clock;
+  // ------------------------------------------------------------------ canvas helpers
+  function setFont(ctx, size, family, bold) { ctx.font = (bold ? "bold " : "") + (Math.round(size * 10) / 10) + "px " + family; }
+  // SkyHomeView.fitText: the given size, shrunk so the text fits maxWidth.
+  function fit(ctx, value, maxWidth, size, family, bold) {
+    setFont(ctx, size, family, bold);
+    var m = value ? ctx.measureText(value).width : 0;
+    if (m > maxWidth && m > 0) { size = size * maxWidth / m; setFont(ctx, size, family, bold); }
+    return size;
+  }
+  // Android's fake bold (thin and monospace clock faces are drawn bold): fill plus a stroke of the same colour.
+  function fakeBoldText(ctx, text, x, y, size) {
+    ctx.fillText(text, x, y);
+    var shadow = ctx.shadowColor;
+    ctx.shadowColor = "rgba(0,0,0,0)";
+    ctx.lineWidth = size / 32;
+    ctx.strokeStyle = ctx.fillStyle;
+    ctx.lineJoin = "round";
+    ctx.strokeText(text, x, y);
+    ctx.shadowColor = shadow;
+  }
+  function shadow(ctx, radius, dy, color) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = radius * 1.15;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = dy;
+  }
+  function noShadow(ctx) { ctx.shadowColor = "rgba(0,0,0,0)"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; ctx.shadowOffsetX = 0; }
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+  function circle(ctx, x, y, r, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ------------------------------------------------------------------ home state (filled once a second)
+  function homeState(now) {
     var row = rowFor(now);
     var next = findNext(now);
-    var active = activeKey(row, now);
-    var suffix = S("time_left_suffix");
-    if (next) {
-      $("discTitle").innerHTML = escapeHtml(untilLabel(next.key, now));
-      $("discValue").innerHTML = escapeHtml(countdown(next, now) + (suffix ? "\n" + suffix : ""));
+    var s = { now: now, row: row, next: next, active: activeKey(row, now), names: [], times: [], activeIndex: -1 };
+    for (var i = 0; i < KEYS.length; ++i) {
+      s.names.push(prayerName(KEYS[i], now));
+      s.times.push(row ? row[KEYS[i]] || "--:--" : "--:--");
+      if (KEYS[i] === s.active) s.activeIndex = i;
+    }
+    s.nextName = next ? dativeUntil(next.key, now) : "";
+    s.nextLeft = next ? remainingHms(next.when, now) : "";
+    s.nextSuffix = S("time_left_suffix");
+    s.sunrise = format(S("dash_sunrise"), row ? row.Gunes : "--:--");
+    s.sunset = format(S("dash_sunset"), row ? row.Aksam : "--:--");
+    s.phase = 2;
+    s.phaseProgress = 0;
+    if (row) {
+      var t = now.getTime(), minute = 60000;
+      var imsak = at(row, "Imsak", now), gunes = at(row, "Gunes", now), aksam = at(row, "Aksam", now), yatsi = at(row, "Yatsi", now);
+      if (imsak && gunes && aksam && yatsi) {
+        var dawnEnd = gunes.getTime() + 20 * minute, sunsetStart = aksam.getTime() - 45 * minute, duskStart = aksam.getTime() + 20 * minute;
+        if (t < imsak.getTime() || t >= yatsi.getTime()) s.phase = 0;
+        else if (t < dawnEnd) { s.phase = 1; s.phaseProgress = (t - imsak.getTime()) / Math.max(1, dawnEnd - imsak.getTime()); }
+        else if (t < sunsetStart) s.phase = 2;
+        else if (t < duskStart) { s.phase = 3; s.phaseProgress = (t - sunsetStart) / Math.max(1, duskStart - sunsetStart); }
+        else { s.phase = 4; s.phaseProgress = (t - duskStart) / Math.max(1, yatsi.getTime() - duskStart); }
+      }
+    }
+    return s;
+  }
+
+  // ------------------------------------------------------------------ Classic (layout 1): photo, prayer row, clock
+  // ReferenceButtonDrawable, prayer chip variant 1: sloped shoulders and a shallow lower point.
+  function chipPath(ctx, x, y, w, h) {
+    var l = x + 1, r = x + w - 1, t = y + 1, b = y + h - 2;
+    var shoulder = Math.min(w * 0.16, h * 0.24), point = Math.min(h * 0.16, w * 0.10);
+    ctx.beginPath();
+    ctx.moveTo(l + shoulder, t);
+    ctx.lineTo(r - shoulder, t);
+    ctx.lineTo(r, t + shoulder);
+    ctx.lineTo(r, b - point);
+    ctx.lineTo((l + r) / 2, b);
+    ctx.lineTo(l, b - point);
+    ctx.lineTo(l, t + shoulder);
+    ctx.closePath();
+  }
+
+  // MainActivity.buildPrayerRow: six chips across the top (dimens sw720dp: 84dp high, 6dp apart, 16sp / 11sp).
+  function drawPrayerRow(ctx, s, top, dash, pal) {
+    var gap = 6 * DP, chipH = 84 * DP, padX = 2 * DP;
+    var left = dash ? 18 * DP + padX : padX;
+    var width = dash ? W - 36 * DP - 2 * padX : W - 2 * padX;
+    var itemW = (width - gap * 5) / 6;
+    var timeSize = 16 * DP, nameSize = 11 * DP;
+    ctx.textAlign = "center";
+    for (var i = 0; i < 6; ++i) {
+      var hi = i === s.activeIndex;
+      var x = left + i * (itemW + gap);
+      if (dash) {
+        roundRect(ctx, x + 0.9, top + 0.9, itemW - 1.8, chipH - 1.8, 14 * DP);
+        ctx.fillStyle = hi ? pal.highlight : CHIP_IDLE;
+        ctx.fill();
+        ctx.lineWidth = 1.2 * DP;
+        ctx.strokeStyle = hi ? pal.nextStroke : CHIP_IDLE_STROKE;
+        ctx.stroke();
+      } else {
+        chipPath(ctx, x, top, itemW, chipH);
+        ctx.fillStyle = hi ? "rgba(29,102,128,0.933)" : "rgba(22,75,104,0.867)";
+        ctx.fill();
+        ctx.lineWidth = 2 * DP;
+        ctx.strokeStyle = hi ? "#FFD75A" : "#87C7D6";
+        ctx.stroke();
+      }
+      var cx = x + itemW / 2;
+      var y = top + 6 * DP;
+      if (!dash) {
+        roundRect(ctx, cx - 11 * DP, y, 22 * DP, 2.5 * DP, 2 * DP);
+        ctx.fillStyle = hi ? "#F0D88A" : "#E8C56A";
+        ctx.fill();
+        y += 2.5 * DP + 4 * DP;
+      }
+      var regular = dash ? "#2C2418" : "#FFFFFF";
+      ctx.fillStyle = hi ? (dash ? pal.highlightText : "#FFD75A") : regular;
+      fit(ctx, s.times[i], itemW - 8 * DP, timeSize, SANS, true);
+      ctx.fillText(s.times[i], cx, y + 1.056 * timeSize);
+      y += 1.327 * timeSize + 2 * DP;
+      ctx.fillStyle = hi ? (dash ? pal.highlightText : "#FFF8D0") : regular;
+      fit(ctx, upper(s.names[i]), itemW - 8 * DP, nameSize, SANS, false);
+      ctx.fillText(upper(s.names[i]), cx, y + 1.056 * nameSize);
+    }
+    return top + chipH;
+  }
+
+  function drawClassic(ctx, s) {
+    var p = preset();
+    var rowBottom = drawPrayerRow(ctx, s, 40 * DP, false);
+    // Clock "HH:mm:ss" and the date lines, centred between the row and the bottom chrome.
+    var now = s.now;
+    var clock = pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
+    var clockSize = Math.min(H * 0.20, W * 0.16);
+    var dateSize = 24 * DP;
+    var lines = dateLines(now, civilDash(now));
+    var clockH = 1.327 * clockSize;
+    var dateH = (0.128 + lines.length * 1.172 + 0.027) * dateSize;
+    var block = clockH + 4 * DP + dateH;
+    var bottom = H - (36 + 96) * DP;
+    var top = rowBottom + (bottom - rowBottom - block) / 2;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#FFE6A0";
+    if (p.clock === 2) {
+      shadow(ctx, 4 * DP, 1 * DP, "rgba(0,0,0,0.8)");
+      setFont(ctx, clockSize, MONO, false);
     } else {
-      $("discTitle").innerHTML = "";
-      $("discValue").innerHTML = "--";
+      shadow(ctx, 10 * DP, 2 * DP, "rgba(0,0,0,0.8)");
+      setFont(ctx, clockSize, THIN, false);
     }
-    var minuteKey = clock + "|" + dateKey(now) + "|" + settings.lang + "|" + rowsFetchedAt + "|" + settings.calc + "|" + (coordinates() ? 1 : 0);
-    if (!force && minuteKey === lastMinuteRendered) { renderSaverStrip(now, row, next, active); return; }
-    lastMinuteRendered = minuteKey;
-
-    var place = settings.districtName ? settings.districtName + (settings.cityName && settings.cityName !== settings.districtName ? ", " + settings.cityName : "") : "";
-    $("placeLine").innerHTML = escapeHtml(place);
-    var hijri = hijriText(hijriParts(row));
-    $("dateLine").innerHTML = escapeHtml(civilDate(now) + (hijri ? "  ·  " + hijri : ""));
-    $("eventLine").innerHTML = escapeHtml(eventFor(now));
-
-    var html = "";
-    for (var i = 0; i < KEYS.length; ++i) {
-      var k = KEYS[i];
-      html += '<div class="card' + (k === active ? " active" : "") + '"><div class="t">' + escapeHtml(row ? row[k] || "--:--" : "--:--") +
-        '</div><div class="n">' + escapeHtml(prayerName(k, now).toLocaleUpperCase ? prayerName(k, now).toLocaleUpperCase(settings.lang) : prayerName(k, now).toUpperCase()) + "</div></div>";
+    fakeBoldText(ctx, clock, W / 2, top + 1.056 * clockSize, clockSize);
+    var y = top + clockH + 4 * DP + 1.056 * dateSize;
+    shadow(ctx, 6 * DP, 1 * DP, "rgba(0,0,0,0.8)");
+    for (var i = 0; i < lines.length; ++i) {
+      ctx.fillStyle = lines[i].color || GOLD_SOFT;
+      fit(ctx, lines[i].text, W * 0.94, dateSize, SANS, !!lines[i].bold);
+      ctx.fillText(lines[i].text, W / 2, y);
+      y += 1.172 * dateSize;
     }
-    $("cards").innerHTML = html;
-
-    var msg = "";
-    if (!settings.districtId) msg = S("location_required");
-    else if (!row && fetching) msg = S("loading");
-    else if (!row && fetchError) msg = S("times_fetch_failed");
-    else if (METHODS[settings.calc] && !coordinates()) msg = S("calc_source_pending");
-    $("homeMessage").innerHTML = escapeHtml(msg);
-    renderSaverStrip(now, row, next, active);
+    noShadow(ctx);
+    drawCorners(ctx, s, rowBottom);
   }
 
-  function renderSaverStrip(now, row, next, active) {
-    if ($("saver").className.indexOf("hidden") >= 0) return;
-    $("saverClock").innerHTML = "<b>" + pad(now.getHours()) + ":" + pad(now.getMinutes()) + "</b>" + escapeHtml(civilDate(now));
-    var html = "";
-    for (var i = 0; i < KEYS.length; ++i) {
-      html += "<span" + (KEYS[i] === active ? ' class="active"' : "") + ">" + escapeHtml(prayerName(KEYS[i], now)) + "<b>" +
-        escapeHtml(row ? row[KEYS[i]] || "--:--" : "--:--") + "</b></span>";
+  // SkyHomeView in corners-only mode: the gold next-prayer disc (right) and the sunrise/sunset pill (left).
+  function drawGoldDisc(ctx, x, y, r) {
+    circle(ctx, x, y, r * 1.22, "rgba(232,197,106,0.333)");
+    circle(ctx, x, y, r, GOLD_SOFT);
+  }
+  function drawDiscText(ctx, x, y, r, s, ink) {
+    var suffix = !!s.nextSuffix;
+    ctx.fillStyle = ink;
+    ctx.textAlign = "center";
+    fit(ctx, s.nextName, r * 1.5, r * 0.27, SANS, true);
+    ctx.fillText(s.nextName, x, y - r * (suffix ? 0.32 : 0.2));
+    fit(ctx, s.nextLeft, r * 1.62, r * 0.4, SANS, false);
+    ctx.fillText(s.nextLeft, x, y + r * (suffix ? 0.16 : 0.38));
+    if (suffix) {
+      fit(ctx, s.nextSuffix, r * 1.3, r * 0.24, SANS, false);
+      ctx.fillText(s.nextSuffix, x, y + r * 0.52);
     }
-    $("saverTimes").innerHTML = html;
-    $("saverNext").innerHTML = next ? escapeHtml(untilLabel(next.key, now)) + "<b>" + escapeHtml(countdown(next, now)) + "</b>" : "";
+  }
+  function drawPill(ctx, s, top0, cornersOnly, dark) {
+    var unit = Math.min(W, H) / 100;
+    var x = unit * 4, y = top0 + unit * 4, pw = W * 0.15, ph = H * 0.12;
+    var ink;
+    if (cornersOnly) {
+      var halo = unit * 1.2;
+      roundRect(ctx, x - halo, y - halo, pw + halo * 2, ph + halo * 2, (ph + halo * 2) / 2);
+      ctx.fillStyle = "rgba(232,197,106,0.333)";
+      ctx.fill();
+      ctx.fillStyle = GOLD_SOFT;
+      ink = "#5A3A08";
+    } else {
+      ctx.fillStyle = dark ? "rgba(43,75,208,0.2)" : "rgba(255,255,255,0.4)";
+      ink = dark ? "#FFFFFF" : "#14306A";
+    }
+    roundRect(ctx, x, y, pw, ph, ph / 2);
+    ctx.fill();
+    ctx.fillStyle = ink;
+    ctx.textAlign = "center";
+    fit(ctx, s.sunrise, pw * 0.84, H * 0.034, SANS, false);
+    ctx.fillText(s.sunrise, x + pw / 2, y + ph * 0.43);
+    fit(ctx, s.sunset, pw * 0.84, H * 0.034, SANS, false);
+    ctx.fillText(s.sunset, x + pw / 2, y + ph * 0.8);
+  }
+  function drawCorners(ctx, s, top0) {
+    var unit = Math.min(W, H) / 100;
+    var r = Math.min(W * 0.078, H * 0.12);
+    var x = W - r - unit * 4, y = top0 + r + unit * 4;
+    drawGoldDisc(ctx, x, y, r);
+    if (s.next) drawDiscText(ctx, x, y, r, s, "#5A3A08");
+    drawPill(ctx, s, top0, true, false);
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  // ------------------------------------------------------------------ Sky (layout 4), SkyHomeView
+  var SKY = [["#070B2E", "#14207A", "#2537B8"], ["#1B2A6B", "#6A5AA8", "#F2A07B"], ["#3E8FE0", "#79B8F0", "#C9E6FA"],
+    ["#2B2F6E", "#C4577A", "#F7A24B"], ["#101548", "#283A9A", "#5A4C9E"]];
+  var STARS = (function () {
+    // java.util.Random(7) is not reproduced; a fixed seeded sequence keeps the stars in place.
+    var seed = 7, out = [];
+    var rnd = function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    for (var i = 0; i < 90; ++i) out.push([rnd(), rnd() * 0.62, 0.6 + rnd() * 1.6, rnd() * 6.28]);
+    return out;
+  })();
+  var cloudCanvas = document.createElement("canvas");
+  cloudCanvas.width = 700; cloudCanvas.height = 400;
+
+  function drawSky(ctx, s) {
+    var unit = Math.min(W, H) / 100;
+    var dark = s.phase === 0 || s.phase === 4 || s.phase === 1;
+    var colors = SKY[s.phase];
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, colors[0]); g.addColorStop(0.55, colors[1]); g.addColorStop(1, colors[2]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    if (s.phase === 0 || s.phase === 4 || (s.phase === 1 && s.phaseProgress < 0.7)) {
+      var fade = s.phase === 1 ? 1 - s.phaseProgress / 0.7 : (s.phase === 4 ? 0.35 + 0.65 * s.phaseProgress : 1);
+      drawStars(ctx, s.now.getTime(), fade);
+    }
+    drawClouds(ctx, unit, s);
+    drawGrass(ctx, s);
+
+    var discR = Math.min(W * 0.078, H * 0.12);
+    var discX = W - discR - unit * 4, discY = discR + unit * 4;
+    var night = s.phase === 0 || s.phase === 4;
+    if (night) {
+      circle(ctx, discX, discY, discR * 1.18, "rgba(201,214,255,0.2)");
+      circle(ctx, discX, discY, discR, "#DCE4FA");
+      circle(ctx, discX - discR * 0.45, discY - discR * 0.5, discR * 0.16, "rgba(34,48,96,0.133)");
+      circle(ctx, discX + discR * 0.55, discY + discR * 0.45, discR * 0.12, "rgba(34,48,96,0.133)");
+      circle(ctx, discX - discR * 0.6, discY + discR * 0.55, discR * 0.09, "rgba(34,48,96,0.133)");
+    } else {
+      circle(ctx, discX, discY, discR * 1.22, s.phase === 3 ? "rgba(255,154,60,0.333)" : (s.phase === 1 ? "rgba(255,192,138,0.333)" : "rgba(255,226,122,0.333)"));
+      circle(ctx, discX, discY, discR, s.phase === 3 ? "#FFC56B" : "#FFE08A");
+    }
+    if (s.next) drawDiscText(ctx, discX, discY, discR, s, night ? "#22305E" : "#5A3A08");
+    drawPill(ctx, s, 0, false, dark);
+
+    // Large clock and the date line.
+    ctx.textAlign = "center";
+    ctx.fillStyle = dark ? "#E6ECFF" : "#FFFFFF";
+    shadow(ctx, unit * 1.2, unit * 0.4, dark ? "rgba(0,0,0,0.4)" : "rgba(32,48,96,0.333)");
+    var clock = pad(s.now.getHours()) + ":" + pad(s.now.getMinutes());
+    fit(ctx, clock, W * 0.5, H * 0.27, SERIF, true);
+    var clockBase = H * 0.42;
+    ctx.fillText(clock, W * 0.5, clockBase);
+    var date = dateLines(s.now, civilDash(s.now))[0].text;
+    fit(ctx, date, W * 0.62, H * 0.045, SANS, false);
+    ctx.fillText(date, W * 0.5, clockBase + H * 0.075);
+    noShadow(ctx);
+
+    // Prayer cards; the prayer whose time has begun is lifted and brighter.
+    var n = s.names.length, gap = unit * 1.6;
+    var cardsW = Math.min(W * 0.86, n * H * 0.24);
+    var cardW = (cardsW - gap * (n - 1)) / n;
+    var cardH = Math.min(H * 0.19, cardW * 0.95);
+    var left = (W - cardsW) * 0.5, top = H * 0.555;
+    var moon = s.phase === 0 || s.phase === 4;
+    for (var i = 0; i < n; ++i) {
+      var active = i === s.activeIndex;
+      var x = left + i * (cardW + gap);
+      var y = active ? top - unit * 1.2 : top;
+      roundRect(ctx, x, y, cardW, cardH, unit * 2.2);
+      ctx.fillStyle = active ? (moon ? "#DCE4FA" : (s.phase === 3 ? "#FFC56B" : "#FFE08A")) : (dark ? "rgba(53,89,216,0.6)" : "rgba(255,255,255,0.7)");
+      ctx.fill();
+      ctx.fillStyle = active ? (moon ? "#22305E" : "#5A3A08") : (dark ? "rgba(230,236,255,0.867)" : "#2A4580");
+      fit(ctx, s.names[i], cardW * 0.86, cardH * 0.18, SANS, true);
+      ctx.fillText(s.names[i], x + cardW / 2, y + cardH * 0.32);
+      fit(ctx, s.times[i], cardW * 0.86, cardH * 0.34, SANS, false);
+      ctx.fillText(s.times[i], x + cardW / 2, y + cardH * 0.74);
+    }
+  }
+  function sparkle(ctx, x, y, r) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.quadraticCurveTo(x, y, x, y + r);
+    ctx.quadraticCurveTo(x, y, x - r, y);
+    ctx.quadraticCurveTo(x, y, x, y - r);
+    ctx.closePath();
+    ctx.fill();
+  }
+  function drawStars(ctx, nowMs, fade) {
+    var t = (nowMs % 60000) / 1000;
+    for (var i = 0; i < STARS.length; ++i) {
+      var st = STARS[i];
+      var twinkle = 0.55 + 0.45 * Math.sin(t * 0.9 + st[3]);
+      var alpha = fade * twinkle;
+      if (alpha * 255 <= 8) continue;
+      ctx.fillStyle = i % 9 === 0 ? "rgba(184,243,107," + alpha.toFixed(3) + ")" : "rgba(255,255,255," + alpha.toFixed(3) + ")";
+      var x = st[0] * W, y = st[1] * H, r = st[2] * H / 600;
+      if (i % 7 === 0) sparkle(ctx, x, y, r * 4.5);
+      else { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+    }
+  }
+  function drawClouds(ctx, unit, s) {
+    var color, outline, alpha;
+    if (s.phase === 2) { color = "#FFFFFF"; outline = "#B5D3F2"; alpha = 240; }
+    else if (s.phase === 3) { color = "#FFD9BC"; outline = "#E7A07A"; alpha = 225; }
+    else if (s.phase === 1) { color = "#EACDE6"; outline = "#B98FBF"; alpha = 215; }
+    else { color = "#2E47C9"; outline = "#1A2A9C"; alpha = 235; }
+    var nowMs = s.now.getTime();
+    var span = W * 1.3;
+    var sail = (nowMs % 240000) / 240000 * span;
+    var sailing = [[0.0, 0.08, 0.72], [0.55, 0.06, 0.6]];
+    for (var i = 0; i < sailing.length; ++i) {
+      var c = sailing[i];
+      var cx = ((c[0] * span + sail) % span) - W * 0.15;
+      drawCloud(ctx, cx, c[1] * H, unit * 8 * c[2], color, outline, alpha);
+    }
+    var t = (nowMs % 30000) / 30000 * 2 * Math.PI;
+    var swaying = [[0.12, 0.42, 1.0, 0], [0.87, 0.46, 0.95, 2.4]];
+    for (i = 0; i < swaying.length; ++i) {
+      var sw = swaying[i];
+      drawCloud(ctx, sw[0] * W + Math.sin(t + sw[3]) * W * 0.04, sw[1] * H, unit * 8 * sw[2], color, outline, alpha);
+    }
+  }
+  // Cartoon cloud: three puffs on a flat base merged into one outline, faded as one on its own layer.
+  function drawCloud(ctx, x, y, r, color, outline, alpha) {
+    var c = cloudCanvas.getContext("2d");
+    var ox = r * 2.2, oy = r * 1.3; // cloud origin inside the scratch canvas
+    var cw = Math.ceil(r * 4.4), ch = Math.ceil(r * 2.6);
+    if (cloudCanvas.width < cw || cloudCanvas.height < ch) { cloudCanvas.width = Math.max(cw, cloudCanvas.width); cloudCanvas.height = Math.max(ch, cloudCanvas.height); }
+    c.clearRect(0, 0, cloudCanvas.width, cloudCanvas.height);
+    var puffs = [[ox - r * 0.95, oy + r * 0.15, r * 0.62], [ox, oy - r * 0.15, r * 0.85], [ox + r * 1.0, oy + r * 0.2, r * 0.66]];
+    var stroke = Math.max(1.5, r * 0.07);
+    // Outline of the union: a doubled stroke under the fill leaves only its outer half visible.
+    c.lineWidth = stroke * 2;
+    c.strokeStyle = outline;
+    c.lineCap = "round";
+    roundRect(c, ox - r * 1.75, oy + r * 0.05, r * 3.6, r * 0.8, r * 0.4);
+    c.stroke();
+    for (var i = 0; i < puffs.length; ++i) { c.beginPath(); c.arc(puffs[i][0], puffs[i][1], puffs[i][2], 0, Math.PI * 2); c.stroke(); }
+    c.fillStyle = color;
+    roundRect(c, ox - r * 1.75, oy + r * 0.05, r * 3.6, r * 0.8, r * 0.4);
+    c.fill();
+    for (i = 0; i < puffs.length; ++i) { c.beginPath(); c.arc(puffs[i][0], puffs[i][1], puffs[i][2], 0, Math.PI * 2); c.fill(); }
+    // Folds: the inner edges of the side puffs.
+    c.lineWidth = stroke;
+    c.beginPath(); c.arc(puffs[0][0], puffs[0][1], puffs[0][2], rad(300), rad(370)); c.stroke();
+    c.beginPath(); c.arc(puffs[2][0], puffs[2][1], puffs[2][2], rad(170), rad(240)); c.stroke();
+    ctx.save();
+    ctx.globalAlpha = alpha / 255;
+    ctx.drawImage(cloudCanvas, 0, 0, cw, ch, x - ox, y - oy, cw, ch);
+    ctx.restore();
+  }
+  // Two rolling hills and, on the far one, an Ottoman mosque with two minarets.
+  function drawGrass(ctx, s) {
+    var back, front, mosque;
+    if (s.phase === 0) { back = "#1B2770"; front = "#121B55"; mosque = "#0B1240"; }
+    else if (s.phase === 4) { back = "#2A2F7E"; front = "#1C2163"; mosque = "#131750"; }
+    else if (s.phase === 1) { back = "#6E5B9E"; front = "#4E417F"; mosque = "#3A2F66"; }
+    else if (s.phase === 3) { back = "#8A4E7E"; front = "#5E3767"; mosque = "#3F2450"; }
+    else { back = "#8CC47E"; front = "#5FA25F"; mosque = "#4E6A85"; }
+    var farTop = H * 0.855;
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(0, farTop + H * 0.03);
+    ctx.bezierCurveTo(W * 0.25, farTop - H * 0.035, W * 0.45, farTop + H * 0.025, W * 0.62, farTop);
+    ctx.bezierCurveTo(W * 0.78, farTop - H * 0.025, W * 0.9, farTop + H * 0.02, W, farTop + H * 0.01);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fillStyle = back;
+    ctx.fill();
+
+    ctx.fillStyle = mosque;
+    var baseY = farTop + H * 0.005, cx = W * 0.885, u = H * 0.012;
+    var bodyTop = baseY - u * 3.2;
+    var halfDome = function (l, t, r, b) {
+      ctx.beginPath();
+      ctx.save();
+      ctx.translate((l + r) / 2, (t + b) / 2);
+      ctx.scale((r - l) / 2, (b - t) / 2);
+      ctx.moveTo(-1, 0);
+      ctx.arc(0, 0, 1, Math.PI, Math.PI * 2);
+      ctx.closePath();
+      ctx.restore();
+      ctx.fill();
+    };
+    ctx.fillRect(cx - u * 7.5, bodyTop, u * 15, baseY + u - bodyTop);
+    ctx.fillRect(cx - u * 3.6, bodyTop - u * 2.2, u * 7.2, u * 2.2);
+    halfDome(cx - u * 4.4, bodyTop - u * 6.6, cx + u * 4.4, bodyTop + u * 0.6);
+    halfDome(cx - u * 6.8, bodyTop - u * 2.4, cx - u * 2.6, bodyTop + u * 1.6);
+    halfDome(cx + u * 2.6, bodyTop - u * 2.4, cx + u * 6.8, bodyTop + u * 1.6);
+    for (var side = -1; side <= 1; side += 2) {
+      var sx = cx + side * u * 6.6;
+      halfDome(sx - u * 1.2, bodyTop - u * 1.3, sx + u * 1.2, bodyTop + u * 1.1);
+    }
+    var tipY = bodyTop - u * 6.2;
+    ctx.fillRect(cx - u * 0.18, tipY - u * 1.6, u * 0.36, u * 1.6);
+    // Crescent: the circle minus a bite.
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, tipY - u * 2.2, u * 0.7, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.rect(cx - u, tipY - u * 3.2, u * 2, u * 2);
+    ctx.arc(cx + u * 0.35, tipY - u * 2.35, u * 0.6, 0, Math.PI * 2, true);
+    ctx.fill();
+    ctx.restore();
+    for (side = -1; side <= 1; side += 2) {
+      var mx = cx + side * u * 10.5;
+      var shaftTop = baseY - u * 17;
+      ctx.fillRect(mx - u * 0.55, shaftTop, u * 1.1, baseY + u - shaftTop);
+      ctx.fillRect(mx - u * 0.75, baseY - u * 3, u * 1.5, u * 4);
+      var bal = [0.45, 0.75];
+      for (var b = 0; b < bal.length; ++b) {
+        var by = baseY - u * 17 * bal[b];
+        ctx.fillRect(mx - u * 1.05, by - u * 0.35, u * 2.1, u * 0.5);
+      }
+      ctx.beginPath();
+      ctx.moveTo(mx - u * 0.6, shaftTop);
+      ctx.lineTo(mx, shaftTop - u * 5);
+      ctx.lineTo(mx + u * 0.6, shaftTop);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(mx - u * 0.1, shaftTop - u * 6.2, u * 0.2, u * 1.2);
+    }
+
+    var nearTop = H * 0.905;
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(0, nearTop);
+    ctx.bezierCurveTo(W * 0.18, nearTop - H * 0.03, W * 0.38, nearTop + H * 0.03, W * 0.55, nearTop + H * 0.005);
+    ctx.bezierCurveTo(W * 0.72, nearTop - H * 0.02, W * 0.88, nearTop + H * 0.035, W, nearTop + H * 0.01);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fillStyle = front;
+    ctx.fill();
   }
 
-  // ------------------------------------------------------------------ adhan (AdhanHelper)
-  var player = $("player");
-  var adhanState = null; // {key, phase: "adhan"|"dua"}
-  var played = load("adhan_played", {});
+  // ------------------------------------------------------------------ Pano / Salon (layouts 2 and 3), home_dash.xml
+  // MosqueMedallionView: gold rim with carving, dark green disc, gold calligraphy (Scheherazade).
+  function drawMedallion(ctx, cx, cy, size, text) {
+    var r = size * 0.46;
+    var g = ctx.createRadialGradient(cx + r * 0.06, cy + r * 0.10, 0, cx + r * 0.06, cy + r * 0.10, r * 1.12);
+    g.addColorStop(0.55, "rgba(0,0,0,0.4)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    circle(ctx, cx + r * 0.05, cy + r * 0.08, r * 1.04, g);
+    g = ctx.createRadialGradient(cx - r * 0.18, cy - r * 0.22, 0, cx - r * 0.18, cy - r * 0.22, r * 1.15);
+    g.addColorStop(0, "#E8D48A"); g.addColorStop(0.45, "#C9A227"); g.addColorStop(1, "#8A6A1E");
+    circle(ctx, cx, cy, r, g);
+    g = ctx.createRadialGradient(cx - r * 0.12, cy - r * 0.18, 0, cx - r * 0.12, cy - r * 0.18, r * 0.95);
+    g.addColorStop(0, "#2A4A40"); g.addColorStop(0.55, "#16352C"); g.addColorStop(1, "#0C201A");
+    circle(ctx, cx, cy, r * 0.90, g);
+    var lg = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    lg.addColorStop(0, "#F0D78A"); lg.addColorStop(1, "#9A7420");
+    ctx.strokeStyle = lg;
+    var rings = [[0.935, Math.max(3, r * 0.055)], [0.80, Math.max(1.5, r * 0.018)], [0.74, Math.max(1, r * 0.010)]];
+    for (var i = 0; i < rings.length; ++i) {
+      ctx.lineWidth = rings[i][1];
+      ctx.beginPath(); ctx.arc(cx, cy, r * rings[i][0], 0, Math.PI * 2); ctx.stroke();
+    }
+    var ring = r * 0.865, sz = Math.max(2.2, r * 0.034);
+    var cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, ring + sz);
+    cg.addColorStop(0, "#E8D48A"); cg.addColorStop(1, "#B8903A");
+    ctx.fillStyle = cg;
+    for (i = 0; i < 24; ++i) {
+      var a = i * Math.PI * 2 / 24 - Math.PI / 2;
+      var x = cx + Math.cos(a) * ring, y = cy + Math.sin(a) * ring;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(a + Math.PI / 2);
+      ctx.scale(sz * 0.55, sz);
+      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    if (!text) return;
+    var family = '"Scheherazade", "Amiri", serif';
+    var maxW = r * 1.22, textSize = r * 0.50;
+    setFont(ctx, textSize, family, false);
+    while (ctx.measureText(text).width > maxW && textSize > 14) { textSize -= 1; setFont(ctx, textSize, family, false); }
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#5A3E12";
+    ctx.fillText(text, cx + r * 0.008, cy + r * 0.010);
+    var tg = ctx.createLinearGradient(cx, cy - r * 0.2, cx, cy + r * 0.25);
+    tg.addColorStop(0, "#F6E7B0"); tg.addColorStop(1, "#C9A227");
+    ctx.fillStyle = tg;
+    ctx.fillText(text, cx, cy);
+    ctx.textBaseline = "alphabetic";
+  }
 
-  function checkAdhan(now) {
-    if (settings.azan === "off" || !DATA.audio[settings.azan]) return;
-    var row = rowFor(now);
-    if (!row) return;
-    var hhmm = pad(now.getHours()) + ":" + pad(now.getMinutes());
+  function drawDash(ctx, s, layout) {
+    var pal = PALETTES[preset().accent];
+    ctx.fillStyle = "#F7F1E4";
+    ctx.fillRect(0, 0, W, H);
+    var padX = 18 * DP, chrome = 96 * DP;
+    var top = 12 * DP;
+    if (layout === 2) top = drawPrayerRow(ctx, s, top, true, pal) + 10 * DP;
+    // Bottom: the next-prayer circle (right) and, on Salon, five wide cards.
+    var circleSize = 108 * DP;
+    var rowBottom = H - chrome - 8 * DP;
+    var rowTop = rowBottom - circleSize;
+    var ccx = W - padX - circleSize / 2, ccy = rowTop + circleSize / 2;
+    ctx.beginPath(); ctx.arc(ccx, ccy, circleSize / 2 - 2.5 * DP, 0, Math.PI * 2);
+    ctx.fillStyle = GOLD_SOFT; ctx.fill();
+    ctx.lineWidth = 5 * DP; ctx.strokeStyle = "#C4A05A"; ctx.stroke();
+    if (s.next) {
+      var sec = Math.max(0, Math.floor((s.next.when.getTime() - s.now.getTime()) / 1000));
+      var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+      var value = h > 0 ? h + ":" + pad(m) : m + " " + S("dash_min");
+      var lines = [{ t: s.nextName, size: 12 * DP }, { t: value, size: 18 * DP }];
+      if (s.nextSuffix) lines.push({ t: s.nextSuffix, size: 18 * DP });
+      var total = 0;
+      for (var i = 0; i < lines.length; ++i) total += 1.327 * lines[i].size;
+      var y = ccy - total / 2;
+      ctx.fillStyle = "#5A3A08";
+      ctx.textAlign = "center";
+      for (i = 0; i < lines.length; ++i) {
+        fit(ctx, lines[i].t, circleSize - 16 * DP, lines[i].size, SANS, true);
+        ctx.fillText(lines[i].t, ccx, y + 1.056 * lines[i].size);
+        y += 1.327 * lines[i].size;
+      }
+    }
+    if (layout === 3) {
+      var gap = 8 * DP, itemH = 92 * DP;
+      var areaW = W - padX * 2 - circleSize - 10 * DP;
+      var keys = [0, 2, 3, 4, 5];
+      var itemW = (areaW - gap * 4) / 5;
+      var itop = ccy - itemH / 2;
+      for (i = 0; i < keys.length; ++i) {
+        var k = keys[i], hi = k === s.activeIndex;
+        var ix = padX + i * (itemW + gap);
+        roundRect(ctx, ix + 0.9, itop + 0.9, itemW - 1.8, itemH - 1.8, 16 * DP);
+        ctx.fillStyle = hi ? pal.highlight : CHIP_IDLE;
+        ctx.fill();
+        ctx.lineWidth = 1.2 * DP;
+        ctx.strokeStyle = hi ? pal.nextStroke : CHIP_IDLE_STROKE;
+        ctx.stroke();
+        var ts = 16 * DP, ns = 12 * DP;
+        var contentH = 1.327 * ts + 6 * DP + 1.327 * ns;
+        var cy = itop + (itemH - contentH) / 2;
+        ctx.fillStyle = hi ? pal.highlightText : "#1A1712";
+        fit(ctx, s.times[k], itemW - 12 * DP, ts, SANS, true);
+        ctx.fillText(s.times[k], ix + itemW / 2, cy + 1.056 * ts);
+        ctx.fillStyle = hi ? pal.highlightText : "#6B5E48";
+        fit(ctx, upper(s.names[k]), itemW - 12 * DP, ns, SANS, false);
+        ctx.fillText(upper(s.names[k]), ix + itemW / 2, cy + 1.327 * ts + 6 * DP + 1.056 * ns);
+      }
+    }
+    // Middle: Muhammad medallion, the clock card, Allah medallion.
+    var midTop = top, midBottom = rowTop;
+    var medal = Math.max(128 * DP, Math.min(228 * DP, H * 0.36));
+    var cardX = padX + medal + 14 * DP + 8 * DP;
+    var cardW = W - padX * 2 - medal * 2 - 28 * DP - 16 * DP;
+    var clockSize = Math.min(H * 0.26, W * 0.24) * 0.8;
+    var dateSize = 15 * DP;
+    var dlines = dateLines(s.now, civilShort(s.now));
+    var cardH = 18 * DP + 1.362 * clockSize + 17 * DP + (0.128 + dlines.length * 1.172 + 0.027) * dateSize + 16 * DP;
+    var midY = (midTop + midBottom) / 2;
+    var cardY = midY - cardH / 2;
+    drawMedallion(ctx, padX + medal / 2, midY, medal, S("dash_panel_muhammad"));
+    drawMedallion(ctx, W - padX - medal / 2, midY, medal, S("dash_panel_allah"));
+    roundRect(ctx, cardX + 0.75, cardY + 0.75, cardW - 1.5, cardH - 1.5, 20 * DP);
+    ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.fill();
+    ctx.lineWidth = 1 * DP; ctx.strokeStyle = "rgba(196,160,90,0.533)"; ctx.stroke();
+    var clock = pad(s.now.getHours()) + ":" + pad(s.now.getMinutes());
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#2C2418";
+    setFont(ctx, clockSize, SERIF, true);
+    var cy2 = cardY + 18 * DP;
+    ctx.fillText(clock, cardX + cardW / 2, cy2 + 1.069 * clockSize);
+    cy2 += 1.362 * clockSize + 8 * DP;
+    ctx.fillStyle = "#C4A86A";
+    ctx.fillRect(cardX + cardW / 2 - 90 * DP, cy2, 180 * DP, 1 * DP);
+    cy2 += 9 * DP + 1.056 * dateSize;
+    for (i = 0; i < dlines.length; ++i) {
+      ctx.fillStyle = dlines[i].color || "#6B5E48";
+      fit(ctx, dlines[i].text, cardW - 56 * DP, dateSize, SANS, !!dlines[i].bold);
+      ctx.fillText(dlines[i].text, cardX + cardW / 2, cy2);
+      cy2 += 1.172 * dateSize;
+    }
+  }
+
+  // ------------------------------------------------------------------ home rendering
+  var homeCtx = null;
+  var lastPhoto = -1;
+  function renderHome(now) {
+    if (!isShown("home")) return;
+    var ctx = homeCtx || (homeCtx = $("homeCanvas").getContext("2d"));
+    var p = preset();
+    if (p.layout === 1 && lastPhoto !== p.photo) {
+      lastPhoto = p.photo;
+      $("homePhoto").style.backgroundImage = "url(" + DATA.homePhotos[p.photo] + ")";
+    }
+    $("homePhoto").style.display = p.layout === 1 ? "block" : "none";
+    ctx.clearRect(0, 0, W, H);
+    var s = homeState(now);
+    if (p.layout === 1) drawClassic(ctx, s);
+    else if (p.layout === 4) drawSky(ctx, s);
+    else drawDash(ctx, s, p.layout);
+    if (!settings.districtId || (!s.row && (fetching || fetchError))) {
+      var msg = !settings.districtId ? S("location_required") : fetching ? S("loading") : S("times_fetch_failed");
+      ctx.textAlign = "center";
+      setFont(ctx, 22 * DP, SANS, false);
+      var tw = ctx.measureText(msg).width + 48 * DP;
+      roundRect(ctx, (W - tw) / 2, H - 150 * DP, tw, 46 * DP, 23 * DP);
+      ctx.fillStyle = "rgba(230,230,230,0.92)"; ctx.fill();
+      ctx.fillStyle = "#222";
+      ctx.fillText(msg, W / 2, H - 150 * DP + 31 * DP);
+    }
+    styleActions(p.layout);
+  }
+
+  // Home action buttons behind the menu toggle (btn_action_bg / ReferenceButtonDrawable, button style 6).
+  var actionStyled = -1;
+  function actionSvg(fill, stroke, dash) {
+    var w = 150, h = 150;
+    var shape;
+    if (dash) {
+      shape = '<rect x="1" y="1" width="148" height="148" rx="21" ry="21" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2.25"/>';
+    } else {
+      var l = 1, r = w - 1, t = 1, b = h - 2, point = Math.min(h * 0.20, w * 0.14), inset = w * 0.28;
+      shape = '<path d="M' + l + ',' + t + 'L' + r + ',' + t + 'L' + r + ',' + (b - point) + 'L' + (r - inset) + ',' + (b - point) + 'L' + ((l + r) / 2) +
+        ',' + b + 'L' + (l + inset) + ',' + (b - point) + 'L' + l + ',' + (b - point) + 'Z" fill="' + fill + '" stroke="' + stroke + '" stroke-width="3"/>';
+    }
+    return "url(\"data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150">' + shape + "</svg>") + "\")";
+  }
+  function styleActions(layout) {
+    if (actionStyled === layout) return;
+    actionStyled = layout;
+    var dash = layout === 2 || layout === 3, sky = layout === 4;
+    var pal = PALETTES[preset().accent];
+    var bg = dash ? actionSvg(pal.buttonFill, pal.buttonStroke, true)
+      : actionSvg(sky ? "rgba(47,79,200,0.867)" : "rgba(22,75,104,0.867)", sky ? "#AFC2FF" : "#87C7D6", false);
+    var buttons = [$("actAdhan"), $("actSettings")];
+    for (var i = 0; i < buttons.length; ++i) {
+      buttons[i].style.backgroundImage = bg;
+      buttons[i].style.color = dash ? pal.buttonText : "#FFFFFF";
+    }
+  }
+  function iconSvg(paths) {
+    var out = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">';
+    for (var i = 0; i < paths.length; ++i) out += '<path fill="' + paths[i][0] + '" d="' + paths[i][1] + '"/>';
+    return out + "</svg>";
+  }
+
+  // ------------------------------------------------------------------ screensaver footer (SkyHomeView.drawSlideDisc)
+  var saverCtx = null;
+  var slideTextDark = false;
+  function renderSaverOverlay(now) {
+    if (!isShown("saver")) return;
+    var ctx = saverCtx || (saverCtx = $("saverOverlay").getContext("2d"));
+    ctx.clearRect(0, 0, W, H);
+    var s = homeState(now);
+    var unit = Math.min(W, H) / 100;
+    // Shift a pixel or two every minute so nothing stays lit in exactly one place for hours.
+    var minute = Math.floor(now.getTime() / 60000);
+    var dx = ((minute * 7) % 5) * unit * 0.4, dy = ((minute * 3) % 3) * unit * 0.3;
+    ctx.textAlign = "center";
+    var r = Math.min(W * 0.06, H * 0.095);
+    var bottom = H - unit * 2 - dy;
+    var discX = W - unit * 3 - r - dx, discY = bottom - r;
+    var stripH = H * 0.11;
+    var stripLeft = unit * 2 + dx;
+    roundRect(ctx, stripLeft, bottom - stripH, discX - stripLeft, stripH, stripH * 0.3);
+    ctx.fillStyle = "rgba(16,24,40,0.36)";
+    ctx.fill();
+    var n = s.names.length, left = stripLeft + unit, right = discX - r - unit;
+    if (right > left) {
+      var slot = (right - left) / n;
+      for (var i = 0; i < n; ++i) {
+        var active = i === s.activeIndex;
+        var cx = left + slot * (i + 0.5);
+        ctx.fillStyle = active ? GOLD_SOFT : "rgba(255,255,255,0.8)";
+        fit(ctx, s.names[i], slot * 0.9, stripH * 0.32, SANS, active);
+        ctx.fillText(s.names[i], cx, bottom - stripH + stripH * 0.4);
+        ctx.fillStyle = active ? GOLD_SOFT : "#FFFFFF";
+        fit(ctx, s.times[i], slot * 0.92, stripH * 0.46, SANS, true);
+        ctx.fillText(s.times[i], cx, bottom - stripH + stripH * 0.87);
+      }
+    }
+    drawGoldDisc(ctx, discX, discY, r);
+    if (s.next) drawDiscText(ctx, discX, discY, r, s, "#5A3A08");
+    // Clock and date, one line centred above the strip.
+    var line = civilDash(now) + "  ·  " + pad(now.getHours()) + ":" + pad(now.getMinutes());
+    ctx.fillStyle = slideTextDark ? "#18202C" : "#FFFFFF";
+    shadow(ctx, unit * 0.8, unit * 0.2, slideTextDark ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.9)");
+    fit(ctx, line, W * 0.5, H * 0.045, SANS, true);
+    ctx.fillText(line, W * 0.5, bottom - stripH - unit * 1.5);
+    noShadow(ctx);
+  }
+
+  // ------------------------------------------------------------------ toast and reminder overlay
+  var toastTimer = null;
+  function toast(text) {
+    var t = $("toast");
+    t.innerHTML = escapeHtml(text);
+    show("toast");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { hide("toast"); }, 3500);
+  }
+  var eventTimer = null;
+  function showEventOverlay(title, subtitle, hideAfterMs) {
+    $("eventTitle").innerHTML = escapeHtml(title);
+    $("eventSubtitle").innerHTML = escapeHtml(subtitle);
+    var o = $("eventOverlay");
+    o.className = "";
+    setTimeout(function () { o.className = "on"; }, 30);
+    if (eventTimer) clearTimeout(eventTimer);
+    eventTimer = setTimeout(hideEventOverlay, hideAfterMs);
+  }
+  function hideEventOverlay() {
+    var o = $("eventOverlay");
+    if (o.className.indexOf("hidden") >= 0) return;
+    o.className = "";
+    setTimeout(function () { if (o.className === "") o.className = "hidden"; }, 720);
+  }
+
+  // checkPrayerReminder: fifteen minutes before each prayer (not sunrise), once a day.
+  var reminded = load("reminder_played", {});
+  function checkReminder(now, row) {
+    if (!settings.reminder || !row) return;
+    var lead = 15;
     var today = dateKey(now);
     for (var i = 0; i < KEYS.length; ++i) {
       var key = KEYS[i];
-      if (key === "Gunes") continue; // as on the tablets: no adhan at sunrise
-      var mark = today + "|" + key;
-      if (row[key] === hhmm && !played[mark]) {
-        played = {};
-        played[mark] = true;
-        store("adhan_played", played);
-        playAdhan(key, now);
-        return;
+      if (key === "Gunes" || reminded[today + "|" + key]) continue;
+      var when = at(row, key, now);
+      if (!when) continue;
+      var diff = when.getTime() - now.getTime();
+      if (diff > lead * 60000 || diff <= lead * 60000 - 60000) continue;
+      var keep = {};
+      for (var m in reminded) if (reminded.hasOwnProperty(m) && m.indexOf(today) === 0) keep[m] = true;
+      keep[today + "|" + key] = true;
+      reminded = keep;
+      store("reminder_played", reminded);
+      var label = prayerName(key, now);
+      toast(format(S("reminder_toast"), label, lead));
+      showEventOverlay(label, format(S("frame_prayer_in_minutes"), lead), 12000);
+      if (!adhanState) {
+        var cue = $("cue");
+        cue.src = DATA.audio.alert[settings.lang] || DATA.audio.alert.en;
+        try { var pr = cue.play(); if (pr && pr.catch) pr.catch(function () { }); } catch (e) { }
       }
+      return;
+    }
+  }
+
+  // ------------------------------------------------------------------ adhan (AdhanHelper + showAdhanMode)
+  var player = $("player");
+  var adhanState = null; // {key, phase: "adhan"|"dua"}
+  var played = load("adhan_played", {});
+  var adhanImages = [];
+  var adhanImageIndex = 0;
+  var adhanImageTimer = null;
+
+  // checkPrayerAdhan: from 2 s before to 5 s after the minute, once per prayer and day; never at sunrise.
+  function checkAdhan(now, row) {
+    if (settings.azan === "off" || !DATA.audio[settings.azan] || !row || adhanState) return;
+    var today = dateKey(now);
+    for (var i = 0; i < KEYS.length; ++i) {
+      var key = KEYS[i];
+      if (key === "Gunes") continue;
+      var mark = today + "|" + key;
+      if (played[mark]) continue;
+      var when = at(row, key, now);
+      if (!when) continue;
+      var diffSec = (when.getTime() - now.getTime()) / 1000;
+      if (diffSec > 2 || diffSec < -5) continue;
+      var keep = {};
+      for (var m in played) if (played.hasOwnProperty(m) && m.indexOf(today) === 0) keep[m] = true;
+      keep[mark] = true;
+      played = keep;
+      store("adhan_played", played);
+      playAdhan(key, now);
+      return;
     }
   }
 
   function playAdhan(key, now) {
+    if (settings.azan === "off" || !DATA.audio[settings.azan]) return;
     var tracks = DATA.audio[settings.azan][key];
     if (!tracks || !tracks.length) return;
     var rot = load("adhan_rotation", {});
@@ -531,20 +1327,46 @@
     rot[settings.azan + key] = index + 1;
     store("adhan_rotation", rot);
     stopSaver();
+    hideEventOverlay();
     adhanState = { key: key, phase: "adhan" };
-    $("adhanName").innerHTML = escapeHtml(prayerName(key, now));
-    $("adhanTime").innerHTML = escapeHtml(pad(now.getHours()) + ":" + pad(now.getMinutes()));
-    $("stopAdhan").innerHTML = escapeHtml(S("stop_adhan"));
-    show("adhan");
-    focusFirst();
+    showAdhanMode();
+    toast(format(S("adhan_playing"), prayerName(key, now)));
     playFile(tracks[index]);
+  }
+
+  function showAdhanMode() {
+    adhanImages = DATA.adhanVisuals.slice();
+    for (var i = adhanImages.length - 1; i > 0; --i) { var j = Math.floor(Math.random() * (i + 1)); var t = adhanImages[i]; adhanImages[i] = adhanImages[j]; adhanImages[j] = t; }
+    adhanImageIndex = 0;
+    // The home photo stays until the first mosque photo has loaded.
+    $("adhanPhoto").style.backgroundImage = "url(" + DATA.homePhotos[preset().photo] + ")";
+    $("adhanCaption").style.display = "none";
+    show("adhan");
+    $("adhanStop").focus();
+    showNextAdhanImage();
+    if (adhanImageTimer) clearInterval(adhanImageTimer);
+    adhanImageTimer = setInterval(showNextAdhanImage, 8000);
+  }
+  function showNextAdhanImage() {
+    if (!adhanImages.length) return;
+    var item = adhanImages[adhanImageIndex % adhanImages.length];
+    ++adhanImageIndex;
+    var img = new Image();
+    img.onload = function () {
+      if (!adhanState) return;
+      $("adhanPhoto").style.backgroundImage = "url(" + item.url + ")";
+      var l = settings.lang;
+      $("adhanCaption").innerHTML = escapeHtml(l === "tr" ? item.tr : l === "de" ? item.de : l === "ar" ? item.ar : item.en);
+      $("adhanCaption").style.display = "block";
+    };
+    img.src = item.url;
   }
 
   function playFile(src) {
     player.src = src;
     try {
       var p = player.play();
-      if (p && p.catch) p.catch(function () { /* blocked: overlay stays so a press can stop it */ });
+      if (p && p.catch) p.catch(function () { });
     } catch (e) { }
   }
 
@@ -561,16 +1383,26 @@
   function stopAdhan() {
     adhanState = null;
     try { player.pause(); } catch (e) { }
+    if (adhanImageTimer) { clearInterval(adhanImageTimer); adhanImageTimer = null; }
     hide("adhan");
     touch();
+    tick(true);
     focusFirst();
   }
+  // toggleAdhan: the next prayer's adhan (Imsak instead of sunrise), or stop the one playing.
+  function toggleAdhan() {
+    if (adhanState) { stopAdhan(); return; }
+    var next = findNext(new Date());
+    var key = next ? next.key : "Imsak";
+    if (key === "Gunes") key = "Imsak";
+    playAdhan(key, new Date());
+  }
 
-  // ------------------------------------------------------------------ screensaver (ScreensaverTextRenderer)
+  // ------------------------------------------------------------------ screensaver (ScreensaverTextRenderer + SlideTransitions)
   var texts = {};
   var deck = [];
   var saverTimer = null;
-  var saverFront = "slideA";
+  var saverFront = "";
   var saverToken = 0;
   var lastActivity = Date.now();
 
@@ -610,10 +1442,11 @@
         hide("home");
         show("saver");
         $("slideA").className = ""; $("slideB").className = "";
+        saverFront = "";
         saverToken++;
         deck = [];
-        render(true);
-        nextSlide(saverToken);
+        renderSaverOverlay(new Date());
+        nextSlide(saverToken, false);
       });
     });
   }
@@ -623,37 +1456,68 @@
     if (saverTimer) { clearTimeout(saverTimer); saverTimer = null; }
     hide("saver");
     show("home");
-    render(true);
+    touch();
+    tick(true);
   }
-  function nextSlide(token) {
+  function nextSlide(token, animate) {
     if (token !== saverToken) return;
     if (!deck.length) deck = buildDeck();
     var id = deck.shift();
     var img = new Image();
     img.onload = function () {
       if (token !== saverToken) return;
-      var back = saverFront === "slideA" ? "slideB" : "slideA";
-      var canvas = $(back);
-      drawSlide(canvas, img, id);
-      $(back).className = "on";
-      $(saverFront).className = "";
-      saverFront = back;
-      saverTimer = setTimeout(function () { nextSlide(token); }, Math.max(5, settings.slide) * 1000);
+      var incoming = saverFront === "slideA" ? "slideB" : "slideA";
+      drawSlide($(incoming), img, id);
+      renderSaverOverlay(new Date());
+      playTransition($(incoming), saverFront ? $(saverFront) : null, animate);
+      saverFront = incoming;
+      saverTimer = setTimeout(function () { nextSlide(token, true); }, Math.max(5, settings.slide) * 1000);
     };
-    img.onerror = function () { saverTimer = setTimeout(function () { nextSlide(token); }, 1000); };
+    img.onerror = function () { saverTimer = setTimeout(function () { nextSlide(token, animate); }, 1000); };
     img.src = id >= DATA.esmaFirst ? "slides/esma.jpg" : "slides/" + ("00" + id).slice(-3) + ".jpg";
   }
 
+  // SlideTransitions: fade, slide from either side, rotate in, or a curved swing; 700 ms.
+  function setTransform(el, t, opacity, animated) {
+    el.className = (animated ? "anim " : "") + "show";
+    el.style.webkitTransform = t;
+    el.style.transform = t;
+    el.style.opacity = opacity;
+  }
+  function playTransition(incoming, outgoing, animate) {
+    if (!animate || !outgoing) {
+      setTransform(incoming, "none", 1, false);
+      if (outgoing) outgoing.className = "";
+      return;
+    }
+    var kind = Math.floor(Math.random() * 5), start, outEnd = "none", outOpacity = 0, inOpacity = 1, startOpacity = 1;
+    if (kind === 1) { start = "translateX(100%)"; outEnd = "translateX(-100%)"; outOpacity = 1; }
+    else if (kind === 2) { start = "translateX(-100%)"; outEnd = "translateX(100%)"; outOpacity = 1; }
+    else if (kind === 3) { start = "rotate(" + (Math.random() < 0.5 ? 90 : -90) + "deg)"; startOpacity = 0.2; }
+    else if (kind === 4) {
+      var fromRight = Math.random() < 0.5;
+      start = "translate(" + (fromRight ? 110 : -110) + "%," + (Math.random() < 0.5 ? 35 : -35) + "%) rotate(" + (fromRight ? 18 : -18) + "deg)";
+    } else { start = "none"; startOpacity = 0; }
+    incoming.style.zIndex = 2;
+    outgoing.style.zIndex = 1;
+    setTransform(incoming, start, startOpacity, false);
+    setTransform(outgoing, "none", 1, false);
+    void incoming.offsetWidth; // apply the start state before animating
+    setTransform(incoming, "none", inOpacity, true);
+    setTransform(outgoing, outEnd, outOpacity, true);
+    setTimeout(function () { if (outgoing.className.indexOf("show") >= 0 && outgoing !== $(saverFront)) outgoing.className = ""; }, 760);
+  }
+
   function arabicScript(lang) { return lang === "ar" || lang === "fa" || lang === "ur"; }
-  function serifFace(arabic) { return arabic ? '"Amiri", serif' : '"MihrapSerif", "Noto Serif", Georgia, serif'; }
+  function quoteFace(arabic) { return arabic ? '"Amiri", serif' : SERIF; }
 
   function drawSlide(canvas, img, id) {
     var ctx = canvas.getContext("2d");
     var w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    // Cover the canvas with the photo (they are 1920x1080 already).
     var scale = Math.max(w / img.width, h / img.height);
     ctx.drawImage(img, (w - img.width * scale) / 2, (h - img.height * scale) / 2, img.width * scale, img.height * scale);
+    slideTextDark = false;
     var rec = record(id);
     if (!rec) return;
     var rtl = arabicScript(rec.lang);
@@ -668,8 +1532,6 @@
       drawQuote(ctx, w, h, rec.r, rtl);
     }
   }
-
-  function setFont(ctx, size, face, bold) { ctx.font = (bold ? "bold " : "") + Math.round(size * 10) / 10 + "px " + face; }
 
   function wrap(ctx, text, maxWidth) {
     var lines = [];
@@ -758,12 +1620,12 @@
   function drawQuote(ctx, w, h, r, arabic) {
     var base = w, left = w * 0.105, right = w * 0.895, top = h * 0.13, bottom = h * 0.83;
     var textBottom = bottom - h * 0.105, dividerY = bottom - h * 0.105;
-    var face = serifFace(arabic);
+    var face = quoteFace(arabic);
     var maxWidth = right - left - w * 0.07, maxTextHeight = h * 0.48;
     var size = base * (arabic ? 0.041 : 0.038), minSize = base * 0.022;
     var lines = null, used = size;
     while (size >= minSize) {
-      setFont(ctx, size, face);
+      setFont(ctx, size, face, false);
       lines = wrap(ctx, r.text, maxWidth);
       used = size;
       if (lines.length * size * (arabic ? 1.48 : 1.30) <= maxTextHeight) break;
@@ -771,16 +1633,17 @@
     }
     if (!lines) return;
     size = used;
-    setFont(ctx, size, face);
+    setFont(ctx, size, face, false);
     var lineHeight = size * (arabic ? 1.48 : 1.30);
     var y = top + ((textBottom - top) - lines.length * lineHeight) * 0.5 + size;
     var center = w * 0.5;
     // The first line chooses the tone for the whole quotation.
     var t = tone(ctx, w, h, center, ctx.measureText(lines[0]).width, y - size, y + size * 0.25);
+    slideTextDark = t.dark;
     for (var i = 0; i < lines.length; ++i) { drawToned(ctx, lines[i], center, y, size, t, t.text); y += lineHeight; }
 
     var srcSize = base * (arabic ? 0.022 : 0.020);
-    setFont(ctx, srcSize, arabic ? '"Amiri", serif' : '"Segoe UI", Roboto, "Noto Sans", Arial, sans-serif', true);
+    setFont(ctx, srcSize, arabic ? '"Amiri", serif' : SANS, true);
     var source = cleanAttribution(r.source_display || r.source || "");
     var srcLines = wrap(ctx, source, maxWidth * 0.86);
     var sy = dividerY + h * 0.055;
@@ -790,16 +1653,14 @@
   function drawEsma(ctx, w, h, r, arabic, showMeaning) {
     var base = w, center = w * 0.5, maxWidth = w * 0.74;
     var areaTop = h * 0.12, areaBottom = h * 0.78;
-    var amiri = '"Amiri", serif', serif = serifFace(false);
+    var amiri = '"Amiri", serif', serif = quoteFace(false);
     var nameAr = r.name_ar || "", name = arabic ? "" : (r.name || ""), meaning = showMeaning ? (r.meaning || "") : "";
     var meaningFace = meaning && /^[؀-ۿ]/.test(meaning) ? amiri : serif;
-    var scale = 1, arSize, nameSize, meaningSize, gap, meaningLine, total, meaningLines;
-    // Glyph boxes are approximated from the font size (canvas has no getTextBounds in old browsers).
-    var arH, nameH;
+    var scale = 1, arSize, nameSize, meaningSize, gap, meaningLine, total, meaningLines, arH, nameH;
     while (true) {
       arSize = base * (arabic ? 0.12 : 0.095) * scale;
-      setFont(ctx, arSize, amiri);
-      while (ctx.measureText(nameAr).width > maxWidth) { arSize *= 0.95; setFont(ctx, arSize, amiri); }
+      setFont(ctx, arSize, amiri, false);
+      while (ctx.measureText(nameAr).width > maxWidth) { arSize *= 0.95; setFont(ctx, arSize, amiri, false); }
       arH = arSize * 1.05;
       nameSize = base * 0.044 * scale;
       meaningSize = base * 0.028 * scale;
@@ -808,31 +1669,32 @@
       nameH = nameSize * 0.75;
       total = arH;
       if (name) total += gap + nameH;
-      setFont(ctx, meaningSize, meaningFace);
+      setFont(ctx, meaningSize, meaningFace, false);
       meaningLines = meaning ? wrap(ctx, meaning, maxWidth) : [];
       if (meaningLines.length) total += gap * 0.8 + meaningSize + (meaningLines.length - 1) * meaningLine;
       if (total <= areaBottom - areaTop || scale < 0.6) break;
       scale *= 0.93;
     }
     var top = areaTop + (areaBottom - areaTop - total) * 0.5;
-    setFont(ctx, arSize, amiri);
+    setFont(ctx, arSize, amiri, false);
     var widest = ctx.measureText(nameAr).width;
-    if (name) { setFont(ctx, nameSize, serif); widest = Math.max(widest, ctx.measureText(name).width); }
-    setFont(ctx, meaningSize, meaningFace);
+    if (name) { setFont(ctx, nameSize, serif, false); widest = Math.max(widest, ctx.measureText(name).width); }
+    setFont(ctx, meaningSize, meaningFace, false);
     for (var i = 0; i < meaningLines.length; ++i) widest = Math.max(widest, ctx.measureText(meaningLines[i]).width);
     var t = tone(ctx, w, h, center, widest, top, top + total);
+    slideTextDark = t.dark;
     var y = top + arH * 0.8;
-    setFont(ctx, arSize, amiri);
+    setFont(ctx, arSize, amiri, false);
     drawToned(ctx, nameAr, center, y, arSize, t, t.text);
     y += arH * 0.2;
     if (name) {
       y += gap + nameH;
-      setFont(ctx, nameSize, serif);
+      setFont(ctx, nameSize, serif, false);
       drawToned(ctx, name, center, y, nameSize, t, t.text);
     }
     if (meaningLines.length) {
       y += gap * 0.8 + meaningSize;
-      setFont(ctx, meaningSize, meaningFace);
+      setFont(ctx, meaningSize, meaningFace, false);
       for (i = 0; i < meaningLines.length; ++i) { drawToned(ctx, meaningLines[i], center, y, meaningSize, t, t.text); y += meaningLine; }
     }
   }
@@ -902,17 +1764,13 @@
     var code = e.keyCode || e.which;
     touch();
     if (isShown("saver")) { e.preventDefault(); stopSaver(); focusFirst(); return; }
-    if (isShown("credits") && (code === 38 || code === 40)) {
-      $("creditsList").scrollTop += code === 40 ? 240 : -240;
-      e.preventDefault();
+    // During the adhan, OK or Back stops it (the tablet stops on a double tap, the TV app on Back).
+    if (isShown("adhan")) {
+      if (code === 13 || BACK_KEYS[code]) { e.preventDefault(); stopAdhan(); }
       return;
     }
-    if (isShown("picker") && !isShown("credits") && (code === 37 || code === 39)) {
-      // Long lists: left/right jump ten entries.
-      var items = focusables($("picker"));
-      var pos = items.indexOf(document.activeElement);
-      var target = items[Math.max(0, Math.min(items.length - 1, (pos < 0 ? 0 : pos) + (code === 39 ? 10 : -10)))];
-      if (target) { target.focus(); keepVisible(target); }
+    if (isShown("credits") && (code === 38 || code === 40)) {
+      $("creditsList").scrollTop += code === 40 ? 240 : -240;
       e.preventDefault();
       return;
     }
@@ -928,17 +1786,15 @@
       goBack();
       return;
     }
-    if (code === 13) {
-      var el = document.activeElement;
-      if (el && el.className && el.className.indexOf("nav") >= 0 && el.tagName !== "BUTTON") { e.preventDefault(); el.click(); }
-    }
+    // Menu key (as on the Fire TV app) opens the settings.
+    if ((code === 93 || code === 18 || code === 457) && isShown("home") && !anyLayer()) { e.preventDefault(); openSettings(); }
   }, true);
   function goBack() {
     var layer = anyLayer();
-    if (layer === "adhan") stopAdhan();
-    else if (layer === "picker") closePicker();
+    if (layer === "picker") closePicker();
     else if (layer === "credits") { hide("credits"); focusFirst(); }
     else if (isShown("settings")) closeSettings(false);
+    else if (isShown("home") && isShown("actionRow")) setMenuOpen(false);
   }
   function wakeFromPointer(e) {
     touch();
@@ -954,9 +1810,14 @@
     wakeFromPointer();
   }, true);
 
+  // The menu toggle shows or hides the action buttons (setMenuOpen).
+  function setMenuOpen(open) {
+    if (open) { show("actionRow"); $("actAdhan").focus(); }
+    else { hide("actionRow"); $("menuToggle").focus(); }
+  }
+
   // ------------------------------------------------------------------ settings screen
   var draft = null;
-  var draftDirty = {};
 
   function opt(label, selected, onClick) {
     var b = document.createElement("button");
@@ -984,17 +1845,25 @@
   function choice(field, values, labels) {
     var out = [];
     for (var i = 0; i < values.length; ++i) {
-      (function (v) { out.push(opt(labels[i], draft[field] === v, function () { draft[field] = v; draftDirty[field] = true; buildSettings(this.id); })); })(values[i]);
+      (function (v) { out.push(opt(labels[i], draft[field] === v, function () { draft[field] = v; buildSettings(this.id); })); })(values[i]);
       out[out.length - 1].id = "opt_" + field + "_" + i;
     }
     return out;
   }
+  function localizeDurations(values, offLabel) {
+    var out = [];
+    for (var i = 0; i < values.length; ++i) {
+      var v = values[i];
+      out.push(v < 60 ? v + " s" : (v / 60) + " " + S("dash_min"));
+    }
+    out.push(offLabel);
+    return out;
+  }
 
   function buildSettings(focusId) {
-    var lang = draft.lang;
     var saved = settings.lang;
-    settings.lang = lang; // labels follow the language being chosen
-    $("settings").setAttribute("dir", RTL[lang] ? "rtl" : "ltr");
+    settings.lang = draft.lang; // labels follow the language being chosen
+    $("settings").setAttribute("dir", RTL[draft.lang] ? "rtl" : "ltr");
     $("settingsTitle").innerHTML = escapeHtml(S("settings"));
     $("saveSettings").innerHTML = escapeHtml(S("save"));
     $("cancelSettings").innerHTML = escapeHtml(S("cancel"));
@@ -1015,37 +1884,30 @@
     loc[0].id = "loc_country"; loc[1].id = "loc_city"; loc[2].id = "loc_district";
     body.appendChild(row(S("location_section"), loc));
 
+    var themeValues = [], themeLabels = [];
+    for (i = 0; i < PRESETS.length; ++i) { themeValues.push(i); themeLabels.push(S(PRESETS[i].name).replace(/\s+[—-].*$/, "")); }
+    body.appendChild(row(S("home_theme"), choice("theme", themeValues, themeLabels)));
+
     body.appendChild(row(S("azan_type_section"), choice("azan", ["turkey", "mecca", "egypt", "off"],
       [S("azan_turkey").replace(/\s+[—-].*$/, ""), S("azan_mecca"), S("azan_egypt"), Wt(W_ADHAN_OFF)])));
     body.appendChild(row(S("dua_after_adhan"), choice("dua", [true, false], [Wt(W_ON), Wt(W_OFF)])));
+    body.appendChild(row(S("reminder_section"), choice("reminder", [true, false], [Wt(W_ON), Wt(W_OFF)]), S("reminder_desc")));
     body.appendChild(row(S("calc_method_section"), choice("calc", ["diyanet", "mwl", "isna", "egypt", "makkah", "karachi", "tehran"],
       [S("calc_diyanet"), S("calc_mwl"), S("calc_isna"), S("calc_egypt"), S("calc_makkah"), S("calc_karachi"), S("calc_tehran")]),
       draft.calc === "diyanet" ? S("calc_source_diyanet") : ""));
     if (draft.calc !== "diyanet") {
       body.appendChild(row(S("asr_method_desc"), choice("asr", ["standard", "hanafi"], [S("asr_evvel"), S("asr_sani")])));
     }
-    body.appendChild(row(Wt(W_SAVER_AFTER), choice("idle", [30, 60, 120, 300, 600, 0],
-      localizeDurations([30, 60, 120, 300, 600], Wt(W_OFF)))));
+    body.appendChild(row(Wt(W_SAVER_AFTER), choice("idle", [30, 60, 120, 300, 600, 0], localizeDurations([30, 60, 120, 300, 600], Wt(W_OFF)))));
     body.appendChild(row(S("slide_seconds"), choice("slide", [10, 20, 30, 60], ["10", "20", "30", "60"])));
     body.appendChild(row(S("show_mihrap_translations"), choice("mihrapTr", [true, false], [Wt(W_ON), Wt(W_OFF)])));
     settings.lang = saved;
     body.scrollTop = scroll;
-    var target = focusId ? $(focusId) : null;
-    focusFirst(target);
-  }
-  function localizeDurations(values, offLabel) {
-    var out = [];
-    for (var i = 0; i < values.length; ++i) {
-      var v = values[i];
-      out.push(v < 60 ? v + " s" : (v / 60) + " " + S("dash_min"));
-    }
-    out.push(offLabel);
-    return out;
+    focusFirst(focusId ? $(focusId) : null);
   }
 
   function openSettings() {
     draft = clone(settings);
-    draftDirty = {};
     show("settings");
     hide("home");
     $("settingsBody").scrollTop = 0;
@@ -1062,11 +1924,13 @@
       computedCache.key = "";
       ensureCoordinates();
       if (langChanged) deck = [];
+      actionStyled = -1;
     }
     hide("settings");
     show("home");
+    hide("actionRow");
     touch();
-    render(true);
+    tick(true);
     focusFirst();
   }
 
@@ -1076,7 +1940,10 @@
     if (resetArmed) { clearTimeout(resetArmed); resetArmed = null; }
     var b = $("resetSettings");
     b.className = "nav big danger";
+    var saved = settings.lang;
+    if (draft) settings.lang = draft.lang;
     b.innerHTML = escapeHtml(Wt(W_RESET));
+    settings.lang = saved;
   }
   function resetPressed() {
     if (!resetArmed) {
@@ -1097,8 +1964,9 @@
     location.reload();
   }
 
-  // ------------------------------------------------------------------ location picker
+  // ------------------------------------------------------------------ location picker (SearchableSpinner: A-Z jump)
   var pickerKind = "";
+  var pickerPlaces = [];
   function openPicker(kind) {
     pickerKind = kind;
     var english = draft.lang !== "tr";
@@ -1106,9 +1974,13 @@
     if (kind === "country") { url = "https://ezanvakti.emushaf.net/ulkeler"; idKey = "UlkeID"; trKey = "UlkeAdi"; enKey = "UlkeAdiEn"; title = S("country"); }
     else if (kind === "city") { url = "https://ezanvakti.emushaf.net/sehirler/" + encodeURIComponent(draft.countryId); idKey = "SehirID"; trKey = "SehirAdi"; enKey = "SehirAdiEn"; title = S("city"); }
     else { url = "https://ezanvakti.emushaf.net/ilceler/" + encodeURIComponent(draft.cityId); idKey = "IlceID"; trKey = "IlceAdi"; enKey = "IlceAdiEn"; title = S("district"); }
+    var saved = settings.lang;
+    settings.lang = draft.lang;
     $("pickerTitle").innerHTML = escapeHtml(title);
     var list = $("pickerList");
     list.innerHTML = '<div class="note" style="margin:0">' + escapeHtml(S("loading")) + "</div>";
+    settings.lang = saved;
+    $("pickerLetters").innerHTML = "";
     list.scrollTop = 0;
     show("picker");
     getJson(url, function (items) {
@@ -1122,6 +1994,7 @@
       }
       places.sort(function (a, b) { return a.name.localeCompare ? a.name.localeCompare(b.name, english ? "en" : "tr") : (a.name < b.name ? -1 : 1); });
       if (places.length === 1) { pick(kind, places[0]); return; } // e.g. United Kingdom has one "city"
+      pickerPlaces = places;
       list.innerHTML = "";
       var current = kind === "country" ? draft.countryId : kind === "city" ? draft.cityId : draft.districtId;
       var focusEl = null;
@@ -1132,7 +2005,22 @@
           list.appendChild(b);
         })(places[i]);
       }
-      focusFirst(focusEl);
+      // Letter buttons jump to the first entry with that initial.
+      var letters = $("pickerLetters");
+      var seen = {};
+      for (i = 0; i < places.length; ++i) {
+        var ch = stripMarks(places[i].name.charAt(0)).toUpperCase();
+        if (!/[A-Z]/.test(ch) || seen[ch]) continue;
+        seen[ch] = i;
+        (function (letter, index) {
+          var b = document.createElement("button");
+          b.className = "nav letter";
+          b.appendChild(document.createTextNode(letter));
+          b.onclick = function () { var target = list.children[index]; if (target) { target.focus(); keepVisible(target); } };
+          letters.appendChild(b);
+        })(ch, i);
+      }
+      focusFirst(focusEl || list.children[0]);
     }, function () {
       list.innerHTML = '<div class="note" style="margin:0">' + escapeHtml(S("times_fetch_failed")) + "</div>";
     });
@@ -1173,7 +2061,7 @@
         html += "<p>#" + ("00" + p.id).slice(-3) + " · " + escapeHtml(p.title || "") + " — " + escapeHtml(p.creator || "") + " · " +
           escapeHtml(p.license || "") + "<br><small>" + escapeHtml(p.url || "") + "</small></p>";
       }
-      html += "<p>Fonts: Amiri, Noto Serif — SIL Open Font License.</p>";
+      html += "<p>Fonts: Amiri, Scheherazade New, Noto Serif — SIL Open Font License; Roboto, Droid Sans Mono — Apache License 2.0.</p>";
       list.innerHTML = html;
       list.scrollTop = 0;
     });
@@ -1182,15 +2070,11 @@
   // ------------------------------------------------------------------ language
   function applyLanguage() {
     document.documentElement.lang = settings.lang;
-    $("medAllah").innerHTML = escapeHtml(S("dash_panel_allah") || "اللّٰهُ");
-    $("medMuhammad").innerHTML = escapeHtml(S("dash_panel_muhammad") || "مُحَمَّدٌ");
     $("startButton").innerHTML = escapeHtml(Wt(W_START));
     $("startHint").innerHTML = escapeHtml(Wt(W_HINT));
-    $("openSettings").setAttribute("aria-label", S("settings"));
-    $("placeLine").setAttribute("dir", "auto");
-    $("dateLine").setAttribute("dir", RTL[settings.lang] ? "rtl" : "ltr");
-    $("eventLine").setAttribute("dir", RTL[settings.lang] ? "rtl" : "ltr");
-    lastMinuteRendered = "";
+    $("lblAdhan").innerHTML = escapeHtml(S("ezan_oku"));
+    $("lblSettings").innerHTML = escapeHtml(S("settings"));
+    $("eventOverlay").setAttribute("dir", RTL[settings.lang] ? "rtl" : "ltr");
   }
 
   // ------------------------------------------------------------------ start and main loop
@@ -1199,24 +2083,25 @@
     var fn = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen || el.mozRequestFullScreen || el.msRequestFullscreen;
     if (fn) { try { var p = fn.call(el); if (p && p.catch) p.catch(function () { }); } catch (e) { } }
   }
-  var wakeLock = null;
   function keepAwake() {
     if (!navigator.wakeLock || !navigator.wakeLock.request) return;
-    try {
-      navigator.wakeLock.request("screen").then(function (l) { wakeLock = l; }, function () { });
-    } catch (e) { }
+    try { navigator.wakeLock.request("screen").then(function () { }, function () { }); } catch (e) { }
   }
   document.addEventListener("visibilitychange", function () { if (!document.hidden) keepAwake(); });
 
-  function begin() {
-    // Unlock audio: a muted play inside the press lets later adhans play without a press.
+  function unlock(audio) {
+    // A muted play inside the press lets later sounds play without a press.
     try {
-      player.muted = true;
-      player.src = DATA.audio.dua;
-      var p = player.play();
-      var after = function () { try { player.pause(); player.currentTime = 0; } catch (e) { } player.muted = false; };
+      audio.muted = true;
+      audio.src = DATA.audio.dua;
+      var p = audio.play();
+      var after = function () { try { audio.pause(); audio.currentTime = 0; } catch (e) { } audio.muted = false; };
       if (p && p.then) p.then(after, after); else setTimeout(after, 300);
-    } catch (e) { player.muted = false; }
+    } catch (e) { audio.muted = false; }
+  }
+  function begin() {
+    unlock(player);
+    unlock($("cue"));
     requestFullscreen();
     keepAwake();
     hide("start");
@@ -1224,41 +2109,54 @@
     if (!settings.districtId) openSettings(); else focusFirst();
   }
 
-  function tick() {
+  function tick(force) {
     var now = new Date();
-    if (!isShown("settings")) render(false);
-    if (!isShown("start")) checkAdhan(now);
-    if (isShown("home") && !anyLayer() && settings.idle > 0 && Date.now() - lastActivity > settings.idle * 1000) startSaver();
-    if (now.getSeconds() === 0 && now.getMinutes() % 30 === 0 && needsFetch()) fetchTimes();
+    var row = rowFor(now);
+    renderHome(now);
+    renderSaverOverlay(now);
+    if (!isShown("start") && !isShown("settings")) {
+      checkReminder(now, row);
+      checkAdhan(now, row);
+    }
+    if (force !== true) {
+      if (isShown("home") && !anyLayer() && settings.idle > 0 && Date.now() - lastActivity > settings.idle * 1000) startSaver();
+      if (now.getSeconds() === 0 && now.getMinutes() % 30 === 0 && needsFetch()) fetchTimes();
+    }
   }
 
   function init() {
     fitStage();
     window.addEventListener("resize", fitStage);
     applyLanguage();
+    $("icAdhan").innerHTML = iconSvg(DATA.icons.adhan);
+    $("icSettings").innerHTML = iconSvg(DATA.icons.settings);
     $("startButton").onclick = begin;
-    $("openSettings").onclick = openSettings;
+    $("menuToggle").onclick = function () { setMenuOpen(!isShown("actionRow")); };
+    $("actAdhan").onclick = function () { hide("actionRow"); toggleAdhan(); };
+    $("actSettings").onclick = function () { hide("actionRow"); openSettings(); };
+    $("adhanStop").onclick = stopAdhan;
     $("saveSettings").onclick = function () { closeSettings(true); };
     $("cancelSettings").onclick = function () { closeSettings(false); };
     $("openCredits").onclick = openCredits;
     $("resetSettings").onclick = resetPressed;
     $("resetSettings").onblur = disarmReset;
     $("closeCredits").onclick = function () { hide("credits"); focusFirst(); };
-    $("stopAdhan").onclick = stopAdhan;
-    render(true);
+    tick(true);
     if (needsFetch()) fetchTimes();
     ensureCoordinates();
     loadTexts("en", function () { loadTexts(settings.lang, function () { }); });
-    // Warm the fonts the slides draw with.
     if (document.fonts && document.fonts.load) {
-      try { document.fonts.load('40px "Amiri"'); document.fonts.load('40px "MihrapSerif"'); } catch (e) { }
+      var faces = ['40px "Amiri"', '40px "Scheherazade"', '40px "MihrapSerif"', 'bold 40px "MihrapSerif"', '40px "MRoboto"',
+        'bold 40px "MRoboto"', '40px "MRobotoThin"', '40px "MMono"'];
+      for (var i = 0; i < faces.length; ++i) { try { document.fonts.load(faces[i]); } catch (e) { } }
     }
     focusFirst();
     setInterval(tick, 1000);
     if (location.hash === "#debug") {
       // Test hooks, only with #debug in the address.
       window.mihrapDebug = { saver: startSaver, slide: function (id) { deck = [id]; }, adhan: function (k) { playAdhan(k, new Date()); },
-        settings: settings };
+        settings: function () { return settings; }, theme: function (i) { settings.theme = i; actionStyled = -1; tick(true); },
+        reminder: function (k) { showEventOverlay(prayerName(k, new Date()), format(S("frame_prayer_in_minutes"), 15), 12000); toast(format(S("reminder_toast"), prayerName(k, new Date()), 15)); } };
     }
   }
 
