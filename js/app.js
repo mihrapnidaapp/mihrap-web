@@ -1174,7 +1174,7 @@
     var pal = PALETTES[preset().accent];
     var bg = dash ? actionSvg(pal.buttonFill, pal.buttonStroke, true)
       : actionSvg(sky ? "rgba(47,79,200,0.867)" : "rgba(22,75,104,0.867)", sky ? "#AFC2FF" : "#87C7D6", false);
-    var buttons = [$("actAdhan"), $("actTesbihat"), $("actSettings")];
+    var buttons = [$("actAdhan"), $("actTesbihat"), $("actSettings"), $("actClose")];
     for (var i = 0; i < buttons.length; ++i) {
       buttons[i].style.backgroundImage = bg;
       buttons[i].style.color = dash ? pal.buttonText : "#FFFFFF";
@@ -1877,8 +1877,9 @@
     if (BACK_KEYS[code]) {
       var tag = document.activeElement && document.activeElement.tagName;
       if (code === 8 && tag === "INPUT") return;
-      e.preventDefault();
-      goBack();
+      // Only swallow Back when it closed something; on the bare home screen the browser gets it
+      // (leave full screen, go back, or close, depending on the TV).
+      if (goBack()) e.preventDefault();
       return;
     }
     // Menu key (as on the Fire TV app) opens the settings.
@@ -1891,6 +1892,25 @@
     else if (isShown("settings")) closeSettings(false);
     else if (isShown("home") && isShown("actionRow")) setMenuOpen(false);
     else if (isShown("home") && tesbihatPlaying) stopTesbihat();
+    else return false;
+    return true;
+  }
+  // Kapat: a page cannot close itself, so this stops every sound, leaves full screen and
+  // returns to the Start screen (the TV's Home key leaves the browser).
+  function closeApp() {
+    if (adhanState) stopAdhan();
+    tesbihatPlaying = false;
+    try { player.pause(); } catch (e) { }
+    try { $("cue").pause(); } catch (e) { }
+    stopSaver();
+    hide("actionRow");
+    hideEventOverlay();
+    var d = document;
+    var exit = d.exitFullscreen || d.webkitExitFullscreen || d.webkitCancelFullScreen || d.mozCancelFullScreen || d.msExitFullscreen;
+    var inFull = d.fullscreenElement || d.webkitFullscreenElement || d.webkitCurrentFullScreenElement || d.mozFullScreenElement || d.msFullscreenElement;
+    if (exit && inFull) { try { var p = exit.call(d); if (p && p.catch) p.catch(function () { }); } catch (e) { } }
+    show("start");
+    focusFirst();
   }
   function wakeFromPointer(e) {
     touch();
@@ -2195,6 +2215,7 @@
     $("startHint").innerHTML = escapeHtml(Wt(W_HINT));
     $("lblAdhan").innerHTML = escapeHtml(S("ezan_oku"));
     $("lblSettings").innerHTML = escapeHtml(S("settings"));
+    $("lblClose").innerHTML = escapeHtml(S("kapat"));
     $("eventOverlay").setAttribute("dir", RTL[settings.lang] ? "rtl" : "ltr");
   }
 
@@ -2259,6 +2280,8 @@
     $("actSettings").onclick = function () { hide("actionRow"); openSettings(); };
     $("actTesbihat").onclick = function () { toggleTesbihat(); };
     $("icTesbihat").innerHTML = iconSvg(DATA.icons.tesbihat);
+    $("icClose").innerHTML = iconSvg(DATA.icons.close);
+    $("actClose").onclick = closeApp;
     $("adhanStop").onclick = stopAdhan;
     // MainActivity.dispatchTouchEvent: during the adhan a double tap (within 550 ms, 150 px) stops it
     // and returns to the clock; single taps are ignored so a stray touch does not cut it off.
