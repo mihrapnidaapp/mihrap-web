@@ -1180,8 +1180,9 @@
       buttons[i].style.color = dash ? pal.buttonText : "#FFFFFF";
     }
   }
-  function iconSvg(paths) {
-    var out = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">';
+  function iconSvg(icon) {
+    var paths = icon.paths;
+    var out = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + icon.viewBox + '">';
     for (var i = 0; i < paths.length; ++i) out += '<path fill="' + paths[i][0] + '" d="' + paths[i][1] + '"/>';
     return out + "</svg>";
   }
