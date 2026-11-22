@@ -97,7 +97,8 @@
   }
   var settings = load("settings", null) || {};
   var DEFAULTS = { lang: defaultLanguage(), countryId: "", countryName: "", cityId: "", cityName: "", districtId: "", districtName: "",
-    azan: "turkey", dua: true, calc: "diyanet", asr: "standard", idle: 30, slide: 20, mihrapTr: true, theme: 0, reminder: true };
+    azan: "turkey", dua: true, calc: "diyanet", asr: "standard", idle: 30, slide: 20, mihrapTr: true, theme: 0, reminder: true,
+    tesbihat: false, tesbihatDelay: 15, tesbihatSet: 1, saverLangs: [] };
   for (var dk in DEFAULTS) if (DEFAULTS.hasOwnProperty(dk) && settings[dk] === undefined) settings[dk] = DEFAULTS[dk];
 
   function S(key) {
@@ -1173,7 +1174,7 @@
     var pal = PALETTES[preset().accent];
     var bg = dash ? actionSvg(pal.buttonFill, pal.buttonStroke, true)
       : actionSvg(sky ? "rgba(47,79,200,0.867)" : "rgba(22,75,104,0.867)", sky ? "#AFC2FF" : "#87C7D6", false);
-    var buttons = [$("actAdhan"), $("actSettings")];
+    var buttons = [$("actAdhan"), $("actTesbihat"), $("actSettings")];
     for (var i = 0; i < buttons.length; ++i) {
       buttons[i].style.backgroundImage = bg;
       buttons[i].style.color = dash ? pal.buttonText : "#FFFFFF";
@@ -1279,6 +1280,7 @@
       toast(format(S("reminder_toast"), label, lead));
       showEventOverlay(label, format(S("frame_prayer_in_minutes"), lead), 12000);
       if (!adhanState) {
+        if (tesbihatPlaying) stopTesbihat(); // playReminderCue stops the helper's previous media
         var cue = $("cue");
         cue.src = DATA.audio.alert[settings.lang] || DATA.audio.alert.en;
         try { var pr = cue.play(); if (pr && pr.catch) pr.catch(function () { }); } catch (e) { }
@@ -1328,6 +1330,8 @@
     store("adhan_rotation", rot);
     stopSaver();
     hideEventOverlay();
+    tesbihatPlaying = false; // a new adhan replaces whatever was playing
+    store("tesbihat_due", null);
     adhanState = { key: key, phase: "adhan" };
     showAdhanMode();
     toast(format(S("adhan_playing"), prayerName(key, now)));
@@ -1371,14 +1375,85 @@
   }
 
   player.addEventListener("ended", function () {
+    if (tesbihatPlaying) { tesbihatPlaying = false; updateTesbihatButton(new Date()); return; }
     if (adhanState && adhanState.phase === "adhan" && settings.dua && adhanState.key !== "Gunes") {
       adhanState.phase = "dua";
       playFile(DATA.audio.dua);
       return;
     }
+    // maybeScheduleTesbihat: only after an adhan (and its dua) that played to the end.
+    if (adhanState) scheduleTesbihat(adhanState.key);
     stopAdhan();
   });
-  player.addEventListener("error", function () { if (adhanState) stopAdhan(); });
+  player.addEventListener("error", function () {
+    if (tesbihatPlaying) { tesbihatPlaying = false; updateTesbihatButton(new Date()); }
+    if (adhanState) stopAdhan();
+  });
+
+  // ------------------------------------------------------------------ tesbihat (AdhanHelper.tesbihatFor + MainActivity)
+  var tesbihatPlaying = false;
+  var tesbihatPrayerKey = "";
+  // Fajr and Asr are followed by Tercuman-i Ism-i Azam, Dhuhr, Maghrib and Isha by Ism-i Azam; set 1 or 2.
+  function tesbihatFor(key) {
+    var morningOrAfternoon = key === "Imsak" || key === "Ikindi";
+    var set = settings.tesbihatSet === 2 ? 2 : 1;
+    return DATA.audio.tesbihat[(morningOrAfternoon ? "tercumani_ismi_azam_" : "ismi_azam_") + set];
+  }
+  function playerBusy() { return !!adhanState || tesbihatPlaying || !$("cue").paused; }
+  function playTesbihat(key) {
+    if (adhanState) return false;
+    tesbihatPlaying = true;
+    playFile(tesbihatFor(key));
+    updateTesbihatButton(new Date());
+    return true;
+  }
+  function stopTesbihat() {
+    tesbihatPlaying = false;
+    try { player.pause(); } catch (e) { }
+    updateTesbihatButton(new Date());
+  }
+  function scheduleTesbihat(key) {
+    if (!settings.tesbihat || key === "Gunes") return;
+    store("tesbihat_due", { at: Date.now() + settings.tesbihatDelay * 60000, key: key });
+  }
+  function maybeStartScheduledTesbihat() {
+    var due = load("tesbihat_due", null);
+    if (!due) return;
+    if (!settings.tesbihat) { store("tesbihat_due", null); return; }
+    var now = Date.now();
+    if (now < due.at) return;
+    if (now - due.at > 5 * 60000) { store("tesbihat_due", null); return; } // expired
+    if (playerBusy()) return; // something else is still sounding; the next tick tries again
+    store("tesbihat_due", null);
+    playTesbihat(due.key);
+  }
+  // The button shows for an hour after each prayer (not sunrise) and while the tesbihat plays.
+  function updateTesbihatButton(now) {
+    if (adhanState) { hide("actTesbihat"); return; }
+    var inWindow = false;
+    for (var d = -1; d <= 0 && !inWindow; ++d) {
+      var day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d);
+      var row = rowFor(day);
+      for (var i = 0; row && i < KEYS.length; ++i) {
+        if (KEYS[i] === "Gunes") continue;
+        var when = at(row, KEYS[i], day);
+        if (!when) continue;
+        var elapsed = now.getTime() - when.getTime();
+        if (elapsed < 0 || elapsed > 3600000) continue;
+        inWindow = true;
+        tesbihatPrayerKey = KEYS[i];
+        break;
+      }
+    }
+    if (inWindow || tesbihatPlaying) show("actTesbihat"); else hide("actTesbihat");
+    var label = S(tesbihatPlaying ? "tesbihat_stop" : "tesbihat");
+    if ($("lblTesbihat").textContent !== label) $("lblTesbihat").innerHTML = escapeHtml(label);
+  }
+  function toggleTesbihat() {
+    if (adhanState) return;
+    store("tesbihat_due", null);
+    if (tesbihatPlaying) stopTesbihat(); else playTesbihat(tesbihatPrayerKey || "Ogle");
+  }
 
   function stopAdhan() {
     adhanState = null;
@@ -1400,7 +1475,6 @@
 
   // ------------------------------------------------------------------ screensaver (ScreensaverTextRenderer + SlideTransitions)
   var texts = {};
-  var deck = [];
   var saverTimer = null;
   var saverFront = "";
   var saverToken = 0;
@@ -1415,39 +1489,60 @@
       done();
     }, function () { texts[lang] = texts[lang] || {}; done(); });
   }
-  function record(id) {
-    var r = texts[settings.lang] && texts[settings.lang][id];
-    if (r) return { r: r, lang: settings.lang };
+  function record(id, lang) {
+    var r = texts[lang] && texts[lang][id];
+    if (r) return { r: r, lang: lang };
     r = texts.en && texts.en[id];
     return r ? { r: r, lang: "en" } : null;
   }
-  function isHidden(id) {
+  // ScreensaverTextRenderer.hidden: Mihrap's own translations the viewer chose not to see (Esma keeps the slide).
+  function isHidden(id, lang) {
     if (settings.mihrapTr) return false;
-    var r = texts[settings.lang] && texts[settings.lang][id];
+    var r = texts[lang] && texts[lang][id];
     return !!(r && r.translation === "mihrap" && r.category !== "ESMA");
   }
-  function buildDeck() {
+  // SlideAssets.languages: the menu language plus the ticked screensaver languages.
+  function saverLanguages() {
+    var out = [settings.lang];
+    var extra = settings.saverLangs || [];
+    for (var i = 0; i < extra.length; ++i) if (LANGS.indexOf(extra[i]) >= 0 && out.indexOf(extra[i]) < 0) out.push(extra[i]);
+    return out;
+  }
+  var allSlideIds = (function () {
     var ids = DATA.slides.slice();
     for (var i = 0; i < DATA.esmaCount; ++i) ids.push(DATA.esmaFirst + i);
-    var out = [];
-    for (i = 0; i < ids.length; ++i) if (!isHidden(ids[i])) out.push(ids[i]);
-    for (i = out.length - 1; i > 0; --i) { var j = Math.floor(Math.random() * (i + 1)); var t = out[i]; out[i] = out[j]; out[j] = t; }
-    return out;
+    return ids;
+  })();
+  var lastSlideId = -1;
+  // SlideAssets.nextRandom: a random slide in a random screensaver language; slides hidden in that
+  // language are skipped, and after many misses any slide will do.
+  function nextRandom() {
+    var languages = saverLanguages(), id, lang, tries = 0;
+    do {
+      id = allSlideIds[Math.floor(Math.random() * allSlideIds.length)];
+      lang = languages[Math.floor(Math.random() * languages.length)];
+    } while (id === lastSlideId || (++tries < 60 && isHidden(id, lang)));
+    lastSlideId = id;
+    return { id: id, lang: lang };
+  }
+  function loadAllTexts(langs, done) {
+    var i = 0;
+    var step = function () { if (i >= langs.length) { done(); return; } loadTexts(langs[i++], step); };
+    step();
   }
 
   function startSaver() {
-    loadTexts("en", function () {
-      loadTexts(settings.lang, function () {
-        if (!isShown("home") || anyLayer()) return;
+    loadAllTexts(["en"].concat(saverLanguages()), function () {
+      if (!isShown("home") || anyLayer()) return;
+      {
         hide("home");
         show("saver");
         $("slideA").className = ""; $("slideB").className = "";
         saverFront = "";
         saverToken++;
-        deck = [];
         renderSaverOverlay(new Date());
         nextSlide(saverToken, false);
-      });
+      }
     });
   }
   function stopSaver() {
@@ -1461,13 +1556,12 @@
   }
   function nextSlide(token, animate) {
     if (token !== saverToken) return;
-    if (!deck.length) deck = buildDeck();
-    var id = deck.shift();
+    var choice = nextRandom(), id = choice.id;
     var img = new Image();
     img.onload = function () {
       if (token !== saverToken) return;
       var incoming = saverFront === "slideA" ? "slideB" : "slideA";
-      drawSlide($(incoming), img, id);
+      drawSlide($(incoming), img, id, choice.lang);
       renderSaverOverlay(new Date());
       playTransition($(incoming), saverFront ? $(saverFront) : null, animate);
       saverFront = incoming;
@@ -1511,14 +1605,14 @@
   function arabicScript(lang) { return lang === "ar" || lang === "fa" || lang === "ur"; }
   function quoteFace(arabic) { return arabic ? '"Amiri", serif' : SERIF; }
 
-  function drawSlide(canvas, img, id) {
+  function drawSlide(canvas, img, id, lang) {
     var ctx = canvas.getContext("2d");
     var w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
     var scale = Math.max(w / img.width, h / img.height);
     ctx.drawImage(img, (w - img.width * scale) / 2, (h - img.height * scale) / 2, img.width * scale, img.height * scale);
     slideTextDark = false;
-    var rec = record(id);
+    var rec = record(id, lang);
     if (!rec) return;
     var rtl = arabicScript(rec.lang);
     canvas.setAttribute("dir", rtl ? "rtl" : "ltr");
@@ -1795,6 +1889,7 @@
     else if (layer === "credits") { hide("credits"); focusFirst(); }
     else if (isShown("settings")) closeSettings(false);
     else if (isShown("home") && isShown("actionRow")) setMenuOpen(false);
+    else if (isShown("home") && tesbihatPlaying) stopTesbihat();
   }
   function wakeFromPointer(e) {
     touch();
@@ -1875,6 +1970,26 @@
     var langNames = [];
     for (var i = 0; i < LANGS.length; ++i) langNames.push(LANG_NAMES[LANGS[i]]);
     body.appendChild(row(S("language"), choice("lang", LANGS, langNames)));
+    body.appendChild(row(S("show_mihrap_translations"), choice("mihrapTr", [true, false], [Wt(W_ON), Wt(W_OFF)])));
+    // Screensaver languages: the menu language is always included; ticked ones are mixed into the slides.
+    var saverButtons = [];
+    for (i = 0; i < LANGS.length; ++i) {
+      (function (code, index) {
+        var locked = code === draft.lang;
+        var on = locked || (draft.saverLangs || []).indexOf(code) >= 0;
+        var b = opt((on ? "✓ " : "") + LANG_NAMES[code], on, function () {
+          if (locked) return;
+          var list = (draft.saverLangs || []).slice(), at2 = list.indexOf(code);
+          if (at2 >= 0) list.splice(at2, 1); else list.push(code);
+          draft.saverLangs = list;
+          buildSettings(this.id);
+        });
+        if (locked) b.style.opacity = "0.6";
+        b.id = "opt_saverLangs_" + index;
+        saverButtons.push(b);
+      })(LANGS[i], i);
+    }
+    body.appendChild(row(S("screensaver_languages"), saverButtons, S("screensaver_languages_desc")));
 
     var loc = [
       opt(S("country") + ": " + (draft.countryName || "—"), false, function () { openPicker("country"); }),
@@ -1891,6 +2006,14 @@
     body.appendChild(row(S("azan_type_section"), choice("azan", ["turkey", "mecca", "egypt", "off"],
       [S("azan_turkey").replace(/\s+[—-].*$/, ""), S("azan_mecca"), S("azan_egypt"), Wt(W_ADHAN_OFF)])));
     body.appendChild(row(S("dua_after_adhan"), choice("dua", [true, false], [Wt(W_ON), Wt(W_OFF)])));
+    body.appendChild(row(S("tesbihat_after_adhan"), choice("tesbihat", [true, false], [Wt(W_ON), Wt(W_OFF)])));
+    if (draft.tesbihat) {
+      var delays = [5, 15, 30, 45, 60], delayLabels = [];
+      for (i = 0; i < delays.length; ++i) delayLabels.push(format(S("tesbihat_minutes"), delays[i]));
+      body.appendChild(row(S("tesbihat_delay"), choice("tesbihatDelay", delays, delayLabels)));
+    }
+    body.appendChild(row(S("tesbihat"), choice("tesbihatSet", [1, 2], [S("tesbihat_set1"), S("tesbihat_set2")]),
+      S("tesbihat_name_tercuman") + " / " + S("tesbihat_name_ismi_azam")));
     body.appendChild(row(S("reminder_section"), choice("reminder", [true, false], [Wt(W_ON), Wt(W_OFF)]), S("reminder_desc")));
     body.appendChild(row(S("calc_method_section"), choice("calc", ["diyanet", "mwl", "isna", "egypt", "makkah", "karachi", "tehran"],
       [S("calc_diyanet"), S("calc_mwl"), S("calc_isna"), S("calc_egypt"), S("calc_makkah"), S("calc_karachi"), S("calc_tehran")]),
@@ -1900,7 +2023,6 @@
     }
     body.appendChild(row(Wt(W_SAVER_AFTER), choice("idle", [30, 60, 120, 300, 600, 0], localizeDurations([30, 60, 120, 300, 600], Wt(W_OFF)))));
     body.appendChild(row(S("slide_seconds"), choice("slide", [10, 20, 30, 60], ["10", "20", "30", "60"])));
-    body.appendChild(row(S("show_mihrap_translations"), choice("mihrapTr", [true, false], [Wt(W_ON), Wt(W_OFF)])));
     settings.lang = saved;
     body.scrollTop = scroll;
     focusFirst(focusId ? $(focusId) : null);
@@ -1916,14 +2038,12 @@
   function closeSettings(save) {
     if (save) {
       var placeChanged = draft.districtId !== settings.districtId;
-      var langChanged = draft.lang !== settings.lang;
       settings = draft;
       store("settings", settings);
       applyLanguage();
       if (placeChanged) { rows = []; rowsDistrict = ""; computedCache.key = ""; fetchTimes(); }
       computedCache.key = "";
       ensureCoordinates();
-      if (langChanged) deck = [];
       actionStyled = -1;
     }
     hide("settings");
@@ -2117,7 +2237,9 @@
     if (!isShown("start") && !isShown("settings")) {
       checkReminder(now, row);
       checkAdhan(now, row);
+      maybeStartScheduledTesbihat();
     }
+    updateTesbihatButton(now);
     if (force !== true) {
       if (isShown("home") && !anyLayer() && settings.idle > 0 && Date.now() - lastActivity > settings.idle * 1000) startSaver();
       if (now.getSeconds() === 0 && now.getMinutes() % 30 === 0 && needsFetch()) fetchTimes();
@@ -2134,6 +2256,8 @@
     $("menuToggle").onclick = function () { setMenuOpen(!isShown("actionRow")); };
     $("actAdhan").onclick = function () { hide("actionRow"); toggleAdhan(); };
     $("actSettings").onclick = function () { hide("actionRow"); openSettings(); };
+    $("actTesbihat").onclick = function () { toggleTesbihat(); };
+    $("icTesbihat").innerHTML = iconSvg(DATA.icons.tesbihat);
     $("adhanStop").onclick = stopAdhan;
     $("saveSettings").onclick = function () { closeSettings(true); };
     $("cancelSettings").onclick = function () { closeSettings(false); };
@@ -2154,7 +2278,7 @@
     setInterval(tick, 1000);
     if (location.hash === "#debug") {
       // Test hooks, only with #debug in the address.
-      window.mihrapDebug = { saver: startSaver, slide: function (id) { deck = [id]; }, adhan: function (k) { playAdhan(k, new Date()); },
+      window.mihrapDebug = { saver: startSaver, pick: nextRandom, tesbihat: toggleTesbihat, adhan: function (k) { playAdhan(k, new Date()); },
         settings: function () { return settings; }, theme: function (i) { settings.theme = i; actionStyled = -1; tick(true); },
         reminder: function (k) { showEventOverlay(prayerName(k, new Date()), format(S("frame_prayer_in_minutes"), 15), 12000); toast(format(S("reminder_toast"), prayerName(k, new Date()), 15)); } };
     }
