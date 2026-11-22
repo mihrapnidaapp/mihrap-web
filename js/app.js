@@ -2260,6 +2260,19 @@
     $("actTesbihat").onclick = function () { toggleTesbihat(); };
     $("icTesbihat").innerHTML = iconSvg(DATA.icons.tesbihat);
     $("adhanStop").onclick = stopAdhan;
+    // MainActivity.dispatchTouchEvent: during the adhan a double tap (within 550 ms, 150 px) stops it
+    // and returns to the clock; single taps are ignored so a stray touch does not cut it off.
+    var lastAdhanTap = { t: 0, x: 0, y: 0 };
+    var adhanTap = function (e) {
+      var p = e.changedTouches && e.changedTouches.length ? e.changedTouches[0] : e;
+      var now = Date.now(), dx = p.clientX - lastAdhanTap.x, dy = p.clientY - lastAdhanTap.y;
+      var doubleTap = now - lastAdhanTap.t <= 550 && dx * dx + dy * dy <= 22500;
+      lastAdhanTap = doubleTap ? { t: 0, x: 0, y: 0 } : { t: now, x: p.clientX, y: p.clientY };
+      if (e.type === "touchend") e.preventDefault(); // no extra click after the touch
+      if (doubleTap && adhanState) stopAdhan();
+    };
+    $("adhan").addEventListener("touchend", adhanTap, false);
+    $("adhan").addEventListener("click", adhanTap, false);
     $("saveSettings").onclick = function () { closeSettings(true); };
     $("cancelSettings").onclick = function () { closeSettings(false); };
     $("openCredits").onclick = openCredits;
