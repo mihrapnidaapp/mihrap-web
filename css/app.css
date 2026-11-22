@@ -68,7 +68,7 @@ button { font-family: inherit; }
 /* ---------- Settings ---------- */
 #settings { background: #f6efe2; color: #2b2116; }
 #settings h1 { margin: 0; padding: 34px 70px 10px; font-size: 54px; color: #3d6e64; }
-#settingsBody { position: absolute; left: 70px; top: 120px; width: 1780px; height: 800px; overflow: hidden; }
+#settingsBody { position: absolute; left: 70px; top: 120px; width: 1780px; height: 800px; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .row { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center;
   margin: 0 0 14px; min-height: 76px; }
 .row .label { width: 470px; font-size: 32px; color: #5a4a34; padding-right: 20px; }
@@ -82,6 +82,12 @@ button { font-family: inherit; }
 .big.danger { border-color: #b5523e; color: #9a3a2a; }
 .big.danger.armed { background: #b5523e; color: #fff; }
 
+/* Scroll areas: the remote scrolls them by focus, a finger or mouse wheel directly. */
+.scroll::-webkit-scrollbar, #settingsBody::-webkit-scrollbar, #pickerList::-webkit-scrollbar, #creditsList::-webkit-scrollbar { width: 14px; }
+#settingsBody::-webkit-scrollbar-thumb, #pickerList::-webkit-scrollbar-thumb, #creditsList::-webkit-scrollbar-thumb { background: #c4a05a; border-radius: 7px; }
+#settingsBody::-webkit-scrollbar-track, #pickerList::-webkit-scrollbar-track, #creditsList::-webkit-scrollbar-track { background: rgba(0,0,0,.06); }
+#settingsBody, #pickerList, #creditsList { -ms-touch-action: pan-y; touch-action: pan-y; }
+
 /* ---------- Picker / credits ---------- */
 #picker, #credits { background: rgba(20,20,20,.55); }
 .pickerBox, .creditsBox { position: absolute; left: 260px; top: 50px; width: 1400px; height: 980px; background: #fffcf7; border-radius: 26px;
@@ -90,9 +96,9 @@ button { font-family: inherit; }
 #pickerLetters { position: absolute; left: 40px; top: 96px; width: 1320px; }
 #pickerLetters .letter { font-size: 26px; width: 46px; height: 52px; padding: 0; margin: 0 4px 6px 0; border-radius: 8px; border: 0;
   background: #e2ddd2; color: #333; cursor: pointer; }
-#pickerList { position: absolute; left: 40px; top: 230px; width: 1320px; height: 720px; overflow: hidden; }
+#pickerList { position: absolute; left: 40px; top: 230px; width: 1320px; height: 720px; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 #pickerList .opt { display: block; width: 1280px; text-align: left; margin: 0 0 10px; }
-#creditsList { position: absolute; left: 40px; top: 110px; width: 1320px; height: 720px; overflow: hidden; font-size: 22px; color: #3a3226; }
+#creditsList { position: absolute; left: 40px; top: 110px; width: 1320px; height: 720px; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; font-size: 22px; color: #3a3226; }
 #creditsList p { margin: 0 0 10px; }
 #closeCredits { position: absolute; left: 40px; top: 860px; }
 

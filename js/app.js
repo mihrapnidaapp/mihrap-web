@@ -2131,7 +2131,7 @@
       var seen = {};
       for (i = 0; i < places.length; ++i) {
         var ch = stripMarks(places[i].name.charAt(0)).toUpperCase();
-        if (!/[A-Z]/.test(ch) || seen[ch]) continue;
+        if (!/[A-Z]/.test(ch) || seen.hasOwnProperty(ch)) continue;
         seen[ch] = i;
         (function (letter, index) {
           var b = document.createElement("button");
