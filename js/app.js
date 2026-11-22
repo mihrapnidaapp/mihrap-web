@@ -1174,7 +1174,7 @@
     var pal = PALETTES[preset().accent];
     var bg = dash ? actionSvg(pal.buttonFill, pal.buttonStroke, true)
       : actionSvg(sky ? "rgba(47,79,200,0.867)" : "rgba(22,75,104,0.867)", sky ? "#AFC2FF" : "#87C7D6", false);
-    var buttons = [$("actAdhan"), $("actSettings")];
+    var buttons = [$("actAdhan"), $("actTesbihat"), $("actSettings")];
     for (var i = 0; i < buttons.length; ++i) {
       buttons[i].style.backgroundImage = bg;
       buttons[i].style.color = dash ? pal.buttonText : "#FFFFFF";
@@ -1375,7 +1375,7 @@
   }
 
   player.addEventListener("ended", function () {
-    if (tesbihatPlaying) { tesbihatPlaying = false; return; }
+    if (tesbihatPlaying) { tesbihatPlaying = false; updateTesbihatButton(new Date()); return; }
     if (adhanState && adhanState.phase === "adhan" && settings.dua && adhanState.key !== "Gunes") {
       adhanState.phase = "dua";
       playFile(DATA.audio.dua);
@@ -1386,12 +1386,13 @@
     stopAdhan();
   });
   player.addEventListener("error", function () {
-    tesbihatPlaying = false;
+    if (tesbihatPlaying) { tesbihatPlaying = false; updateTesbihatButton(new Date()); }
     if (adhanState) stopAdhan();
   });
 
   // ------------------------------------------------------------------ tesbihat (AdhanHelper.tesbihatFor + MainActivity)
   var tesbihatPlaying = false;
+  var tesbihatPrayerKey = "";
   // Fajr and Asr are followed by Tercuman-i Ism-i Azam, Dhuhr, Maghrib and Isha by Ism-i Azam; set 1 or 2.
   function tesbihatFor(key) {
     var morningOrAfternoon = key === "Imsak" || key === "Ikindi";
@@ -1403,11 +1404,13 @@
     if (adhanState) return false;
     tesbihatPlaying = true;
     playFile(tesbihatFor(key));
+    updateTesbihatButton(new Date());
     return true;
   }
   function stopTesbihat() {
     tesbihatPlaying = false;
     try { player.pause(); } catch (e) { }
+    updateTesbihatButton(new Date());
   }
   function scheduleTesbihat(key) {
     if (!settings.tesbihat || key === "Gunes") return;
@@ -1423,6 +1426,33 @@
     if (playerBusy()) return; // something else is still sounding; the next tick tries again
     store("tesbihat_due", null);
     playTesbihat(due.key);
+  }
+  // The button shows for an hour after each prayer (not sunrise) and while the tesbihat plays.
+  function updateTesbihatButton(now) {
+    if (adhanState) { hide("actTesbihat"); return; }
+    var inWindow = false;
+    for (var d = -1; d <= 0 && !inWindow; ++d) {
+      var day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d);
+      var row = rowFor(day);
+      for (var i = 0; row && i < KEYS.length; ++i) {
+        if (KEYS[i] === "Gunes") continue;
+        var when = at(row, KEYS[i], day);
+        if (!when) continue;
+        var elapsed = now.getTime() - when.getTime();
+        if (elapsed < 0 || elapsed > 3600000) continue;
+        inWindow = true;
+        tesbihatPrayerKey = KEYS[i];
+        break;
+      }
+    }
+    if (inWindow || tesbihatPlaying) show("actTesbihat"); else hide("actTesbihat");
+    var label = S(tesbihatPlaying ? "tesbihat_stop" : "tesbihat");
+    if ($("lblTesbihat").textContent !== label) $("lblTesbihat").innerHTML = escapeHtml(label);
+  }
+  function toggleTesbihat() {
+    if (adhanState) return;
+    store("tesbihat_due", null);
+    if (tesbihatPlaying) stopTesbihat(); else playTesbihat(tesbihatPrayerKey || "Ogle");
   }
 
   function stopAdhan() {
@@ -2209,6 +2239,7 @@
       checkAdhan(now, row);
       maybeStartScheduledTesbihat();
     }
+    updateTesbihatButton(now);
     if (force !== true) {
       if (isShown("home") && !anyLayer() && settings.idle > 0 && Date.now() - lastActivity > settings.idle * 1000) startSaver();
       if (now.getSeconds() === 0 && now.getMinutes() % 30 === 0 && needsFetch()) fetchTimes();
@@ -2225,6 +2256,8 @@
     $("menuToggle").onclick = function () { setMenuOpen(!isShown("actionRow")); };
     $("actAdhan").onclick = function () { hide("actionRow"); toggleAdhan(); };
     $("actSettings").onclick = function () { hide("actionRow"); openSettings(); };
+    $("actTesbihat").onclick = function () { toggleTesbihat(); };
+    $("icTesbihat").innerHTML = iconSvg(DATA.icons.tesbihat);
     $("adhanStop").onclick = stopAdhan;
     $("saveSettings").onclick = function () { closeSettings(true); };
     $("cancelSettings").onclick = function () { closeSettings(false); };
@@ -2245,7 +2278,7 @@
     setInterval(tick, 1000);
     if (location.hash === "#debug") {
       // Test hooks, only with #debug in the address.
-      window.mihrapDebug = { saver: startSaver, pick: nextRandom, adhan: function (k) { playAdhan(k, new Date()); },
+      window.mihrapDebug = { saver: startSaver, pick: nextRandom, tesbihat: toggleTesbihat, adhan: function (k) { playAdhan(k, new Date()); },
         settings: function () { return settings; }, theme: function (i) { settings.theme = i; actionStyled = -1; tick(true); },
         reminder: function (k) { showEventOverlay(prayerName(k, new Date()), format(S("frame_prayer_in_minutes"), 15), 12000); toast(format(S("reminder_toast"), prayerName(k, new Date()), 15)); } };
     }
