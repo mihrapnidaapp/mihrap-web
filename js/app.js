@@ -9,6 +9,9 @@
   "use strict";
 
   var DATA = window.MIHRAP_DATA;
+  // Chrome fires this when the page meets the install rules (PWA); noted for checks, the browser's own prompt is left alone.
+  window.mihrapInstallable = false;
+  window.addEventListener("beforeinstallprompt", function () { window.mihrapInstallable = true; });
   var W = 1920, H = 1080, DP = 1.5;
   var KEYS = ["Imsak", "Gunes", "Ogle", "Ikindi", "Aksam", "Yatsi"];
   var LANGS = ["tr", "en", "de", "ar", "fa", "id", "ms", "zh", "ur", "hi"];
