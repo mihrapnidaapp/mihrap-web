@@ -120,8 +120,9 @@
   // ------------------------------------------------------------------ stage scaling
   function fitStage() {
     var stage = $("stage");
-    var w = window.innerWidth || document.documentElement.clientWidth;
-    var h = window.innerHeight || document.documentElement.clientHeight;
+    var frame = $("frame");
+    var w = (frame && frame.clientWidth) || window.innerWidth || document.documentElement.clientWidth;
+    var h = (frame && frame.clientHeight) || window.innerHeight || document.documentElement.clientHeight;
     var scale = Math.min(w / W, h / H);
     var left = Math.round((w - W * scale) / 2), top = Math.round((h - H * scale) / 2);
     var t = "translate(" + left + "px," + top + "px) scale(" + scale + ")";

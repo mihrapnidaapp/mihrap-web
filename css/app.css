@@ -9,7 +9,11 @@
 @font-face { font-family: "MRobotoThin"; src: url("../fonts/Roboto-Thin.ttf") format("truetype"); }
 @font-face { font-family: "MMono"; src: url("../fonts/DroidSansMono.ttf") format("truetype"); }
 
-html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000;
+  -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* The 1920 px stage sits in a screen-sized fixed frame, so phones and tablets cannot widen the page
+   to fit it (which zoomed the page out and shifted everything sideways). */
+#frame { position: fixed; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; }
 body { font-family: "MRoboto", Roboto, "Noto Sans", Arial, sans-serif; -webkit-user-select: none; user-select: none; cursor: default; }
 button { font-family: inherit; }
 
