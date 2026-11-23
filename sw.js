@@ -3,10 +3,13 @@
  * - The page, its code and data are fetched fresh first (so updates arrive at once) and the
  *   last good copy is used offline.
  * - Slides, fonts, home photos and icons are kept once loaded (cache first).
- * - Audio is left to the browser: cached responses can break seeking/range requests.
+ * - Audio: the page stores the chosen adhan set, dua, reminder and tesbihat recordings in
+ *   AUDIO; they are served from there (byte ranges answered by slicing) so the adhan plays
+ *   offline. Recordings not stored yet come from the network as before.
  * - Other sites (prayer-time APIs, adhan photos) are not touched.
  */
 var CACHE = "mihrap-v1";
+var AUDIO = "mihrap-audio-v1";
 
 self.addEventListener("install", function (event) {
   event.waitUntil(caches.open(CACHE).then(function (cache) {
@@ -17,7 +20,7 @@ self.addEventListener("install", function (event) {
 
 self.addEventListener("activate", function (event) {
   event.waitUntil(caches.keys().then(function (keys) {
-    return Promise.all(keys.filter(function (k) { return k.indexOf("mihrap-") === 0 && k !== CACHE; })
+    return Promise.all(keys.filter(function (k) { return k.indexOf("mihrap-") === 0 && k !== CACHE && k !== AUDIO; })
       .map(function (k) { return caches.delete(k); }));
   }).then(function () { return self.clients.claim(); }));
 });
@@ -54,7 +57,10 @@ self.addEventListener("fetch", function (event) {
   if (request.method !== "GET") return;
   var url = new URL(request.url);
   if (url.origin !== self.location.origin) return;            // APIs and adhan photos: untouched
-  if (url.pathname.indexOf("/audio/") >= 0) return;           // audio: browser handles ranges
+  if (url.pathname.indexOf("/audio/") >= 0) {
+    event.respondWith(audioResponse(request));
+    return;
+  }
   if (request.headers.get("range")) return;
   if (/\/(slides|fonts|home|icons)\//.test(url.pathname)) {
     event.respondWith(cacheFirst(request));
@@ -62,3 +68,35 @@ self.addEventListener("fetch", function (event) {
   }
   event.respondWith(networkFirst(request));                   // page, js, css, data
 });
+
+// A stored recording, whole or the byte range the media element asks for; otherwise the network.
+function audioResponse(request) {
+  var key = request.url.split("#")[0];
+  return caches.open(AUDIO).then(function (cache) {
+    return cache.match(key).then(function (hit) {
+      if (!hit) return fetch(request);
+      var range = request.headers.get("range");
+      if (!range) return hit;
+      return hit.blob().then(function (blob) {
+        var m = /bytes=(\d*)-(\d*)/.exec(range);
+        var size = blob.size;
+        var start = m && m[1] ? parseInt(m[1], 10) : 0;
+        var end = m && m[2] ? Math.min(parseInt(m[2], 10), size - 1) : size - 1;
+        if (m && !m[1] && m[2]) { start = Math.max(0, size - parseInt(m[2], 10)); end = size - 1; }
+        if (start >= size) {
+          return new Response("", { status: 416, headers: { "Content-Range": "bytes */" + size } });
+        }
+        return new Response(blob.slice(start, end + 1), {
+          status: 206,
+          statusText: "Partial Content",
+          headers: {
+            "Content-Type": hit.headers.get("Content-Type") || "audio/mpeg",
+            "Content-Range": "bytes " + start + "-" + end + "/" + size,
+            "Content-Length": String(end - start + 1),
+            "Accept-Ranges": "bytes"
+          }
+        });
+      });
+    });
+  }).catch(function () { return fetch(request); });
+}

@@ -164,11 +164,14 @@
     if (!district || fetching) return;
     fetching = true;
     var start = new Date(), end = new Date();
-    end.setDate(end.getDate() + 29);
+    end.setDate(end.getDate() + TIMES_DAYS - 1);
+    store("times_attempt", Date.now());
     var finish = function (list) {
       fetching = false;
       if (list && list.length) {
-        rows = list; rowsDistrict = district; rowsFetchedAt = Date.now(); fetchError = false;
+        // TimesCache: merge by date with what is kept, drop days before yesterday.
+        rows = mergeRows(rowsDistrict === district ? rows : [], list);
+        rowsDistrict = district; rowsFetchedAt = Date.now(); fetchError = false;
         store("times_rows", rows); store("times_district", district); store("times_fetched", rowsFetchedAt);
       } else {
         fetchError = true;
@@ -187,13 +190,73 @@
       }, fallback);
   }
 
-  function needsFetch() {
+  // TimesSync: keep a rolling window of 90 days from today, as the tablets do.
+  var TIMES_DAYS = 90;
+  function rowTime(row) {
+    var p = String(row && row.MiladiTarihKisa || "").split(".");
+    return p.length === 3 ? new Date(+p[2], +p[1] - 1, +p[0]).getTime() : NaN;
+  }
+  function mergeRows(existing, incoming) {
+    var byDate = {}, i;
+    for (i = 0; i < existing.length; ++i) if (existing[i] && existing[i].MiladiTarihKisa) byDate[existing[i].MiladiTarihKisa] = existing[i];
+    for (i = 0; i < incoming.length; ++i) if (incoming[i] && incoming[i].MiladiTarihKisa) byDate[incoming[i].MiladiTarihKisa] = incoming[i];
+    var now = new Date(), from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+    var out = [];
+    for (var k in byDate) if (byDate.hasOwnProperty(k) && rowTime(byDate[k]) >= from) out.push(byDate[k]);
+    out.sort(function (a, b) { return rowTime(a) - rowTime(b); });
+    return out;
+  }
+  function forwardDays() {
+    var now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(), n = 0;
+    for (var i = 0; i < rows.length; ++i) if (rowTime(rows[i]) >= today) n++;
+    return n;
+  }
+  function needsFetch(ignoreWait) {
     if (!settings.districtId) return false;
     if (rowsDistrict !== settings.districtId || !rows.length) return true;
-    var ahead = new Date();
-    ahead.setDate(ahead.getDate() + 3);
-    if (!rowFor(ahead)) return true;
-    return Date.now() - rowsFetchedAt > 7 * 86400000;
+    if (forwardDays() >= TIMES_DAYS) return false;
+    // Fewer than 90 days left: top up, at most every six hours (the fallback source gives only a month).
+    return ignoreWait || Date.now() - load("times_attempt", 0) > 6 * 3600000;
+  }
+
+  // Adhan, dua, reminder and tesbihat recordings kept on the device so the adhan plays offline
+  // (the tablets download them the same way); sw.js serves them, with byte ranges.
+  var AUDIO_CACHE = "mihrap-audio-v1";
+  var cachingAudio = false;
+  function wantedAudio() {
+    var list = [DATA.audio.dua], k;
+    if (settings.azan !== "off" && DATA.audio[settings.azan]) {
+      for (k in DATA.audio[settings.azan]) if (DATA.audio[settings.azan].hasOwnProperty(k)) list = list.concat(DATA.audio[settings.azan][k]);
+    }
+    if (DATA.audio.alert[settings.lang] || DATA.audio.alert.en) list.push(DATA.audio.alert[settings.lang] || DATA.audio.alert.en);
+    var set = settings.tesbihatSet === 2 ? 2 : 1;
+    list.push(DATA.audio.tesbihat["ismi_azam_" + set], DATA.audio.tesbihat["tercumani_ismi_azam_" + set]);
+    return list;
+  }
+  function cacheAudio() {
+    if (cachingAudio || !window.caches || !window.fetch || navigator.onLine === false) return;
+    cachingAudio = true;
+    var wanted = wantedAudio(), wantedAbs = {};
+    for (var i = 0; i < wanted.length; ++i) wantedAbs[new URL(wanted[i], location.href).href] = true;
+    caches.open(AUDIO_CACHE).then(function (cache) {
+      return cache.keys().then(function (keys) {
+        // Recordings of another adhan set or language are removed to save space.
+        var drops = [];
+        for (var j = 0; j < keys.length; ++j) if (!wantedAbs[keys[j].url]) drops.push(cache.delete(keys[j]));
+        return Promise.all(drops);
+      }).then(function () {
+        var chain = Promise.resolve();
+        wanted.forEach(function (url) {
+          chain = chain.then(function () {
+            return cache.match(url).then(function (hit) {
+              if (hit) return;
+              return fetch(url).then(function (r) { if (r.ok && r.status === 200) return cache.put(url, r); });
+            });
+          });
+        });
+        return chain;
+      });
+    }).then(function () { cachingAudio = false; }, function () { cachingAudio = false; });
   }
 
   // ------------------------------------------------------------------ computed times (CalculatedTimes)
@@ -2132,6 +2195,7 @@
       computedCache.key = "";
       ensureCoordinates();
       actionStyled = -1;
+      cacheAudio();
     }
     hide("settings");
     show("home");
@@ -2330,7 +2394,10 @@
     updateTesbihatButton(now);
     if (force !== true) {
       if (isShown("home") && !anyLayer() && settings.idle > 0 && Date.now() - lastActivity > settings.idle * 1000) startSaver();
-      if (now.getSeconds() === 0 && now.getMinutes() % 30 === 0 && needsFetch()) fetchTimes();
+      if (now.getSeconds() === 0 && now.getMinutes() % 30 === 0) {
+        if (needsFetch()) fetchTimes();
+        cacheAudio();
+      }
     }
   }
 
@@ -2370,6 +2437,9 @@
     $("closeCredits").onclick = function () { hide("credits"); focusFirst(); };
     tick(true);
     if (needsFetch()) fetchTimes();
+    // As soon as the connection is back: top up the 90 days and the recordings.
+    window.addEventListener("online", function () { if (needsFetch(true)) fetchTimes(); cacheAudio(); });
+    setTimeout(cacheAudio, 15000);
     ensureCoordinates();
     loadTexts("en", function () { loadTexts(settings.lang, function () { }); });
     if (document.fonts && document.fonts.load) {
