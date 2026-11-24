@@ -232,7 +232,8 @@
 
   // Adhan, dua, reminder and tesbihat recordings kept on the device so the adhan plays offline
   // (the tablets download them the same way); sw.js serves them, with byte ranges.
-  var AUDIO_CACHE = "mihrap-audio-v1";
+  // Renamed when the app moved to /mihrap/: the retired root service worker deletes the old names.
+  var AUDIO_CACHE = "mihrap-app-audio-v2";
   var cachingAudio = false;
   function wantedAudio() {
     var list = [DATA.audio.dua], k;
@@ -2467,7 +2468,7 @@
     // button and menu) starts, like the Start button.
     $("start").addEventListener("click", function (e) {
       var t = e.target;
-      while (t && t !== this) { if (t.id === "startLang" || t.id === "langMenu" || t.id === "startButton") return; t = t.parentNode; }
+      while (t && t !== this) { if (t.id === "startLang" || t.id === "langMenu" || t.id === "startButton" || t.id === "startStudio") return; t = t.parentNode; }
       if (isShown("langMenu")) { closeLangMenu(); return; }
       begin();
     });
