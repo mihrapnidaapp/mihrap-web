@@ -28,109 +28,133 @@
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="en_GB">
 <meta property="og:locale:alternate" content="tr_TR">
-<meta name="theme-color" content="#071a30">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="mihrap/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="mihrap/icons/icon-180.png">
 <style>
-/* Studio home: one column, app cards. Mihrap's navy, cream and gold. */
-@font-face { font-family: "Amiri"; src: url("mihrap/fonts/amiri_regular.ttf") format("truetype"); font-display: swap; }
-:root { --bg: #071a30; --card: #0c2847; --fg: #faf1e1; --muted: #b9c3cf; --gold: #d4a94a; --line: rgba(250,241,225,.14); color-scheme: dark; }
+/* Studio home, "white gallery": white page, large black type, no boxes; each app shown by its own picture.
+   System fonts only, so opening the page sends nothing to other sites. */
+:root {
+  --bg: #ffffff; --ink: #111111; --soft: #333333; --muted: #666666; --faint: #999999; --rule: #dddddd;
+  --accent: #1d6680; /* the Android app's prayer-chip blue */
+  --sans: "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, sans-serif;
+  color-scheme: light;
+}
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
-main { max-width: 860px; margin: 0 auto; padding: 48px 20px 40px; display: flex; flex-direction: column; gap: 36px; }
-header { display: flex; flex-direction: column; gap: 10px; }
-.top { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-h1 { font-family: "Amiri", Georgia, serif; font-weight: 400; font-size: 52px; line-height: 1.1; margin: 0; }
-.intro { margin: 0; color: var(--muted); max-width: 60ch; font-size: 19px; }
-.lang { background: none; border: 1px solid rgba(250,241,225,.4); color: var(--fg); border-radius: 20px; padding: 6px 16px; font: inherit; font-size: 15px; cursor: pointer; }
-.apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-.app { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
-.head { display: flex; align-items: center; gap: 16px; }
-.icon { width: 64px; height: 64px; border-radius: 15px; flex: none; }
-.roomy-icon { background: linear-gradient(145deg, #2a78d6, #6fb3ff); display: grid; place-items: center; font-size: 34px; font-weight: 700; color: #fff; }
-h2 { margin: 0; font-size: 26px; font-weight: 600; }
-.platforms { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
-.app p.desc { margin: 0; color: var(--fg); }
-.actions { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
-.button { display: inline-block; background: var(--gold); color: #1c1407; text-decoration: none; font-weight: 600; padding: 11px 22px; border-radius: 26px; }
-.link { color: #f1d48c; }
-.badge { font-size: 14px; color: var(--gold); border: 1px solid rgba(212,169,74,.6); border-radius: 14px; padding: 3px 12px; }
-footer { color: var(--muted); font-size: 15px; border-top: 1px solid var(--line); padding-top: 20px; }
-footer a { color: #f1d48c; }
-@media (max-width: 520px) { h1 { font-size: 42px; } main { padding-top: 32px; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.55 var(--sans); }
+.wrap { max-width: 960px; margin: 0 auto; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+a { color: inherit; text-decoration: none; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+p, h1, h2 { margin: 0; }
+.top { display: flex; justify-content: space-between; align-items: baseline; padding-block: 28px 0; }
+.word { font-weight: 800; font-size: 22px; letter-spacing: -.01em; }
+.lang { display: flex; gap: 2px; align-items: baseline; font-size: 15px; color: var(--muted); }
+.lang button { background: none; border: 0; padding: 2px 4px; font: inherit; color: var(--muted); cursor: pointer; }
+.lang button[aria-pressed="true"] { color: var(--ink); font-weight: 700; }
+h1 { font-size: 52px; font-weight: 700; line-height: 1.05; letter-spacing: -.025em; max-width: 16ch; padding-block: 64px 48px; text-wrap: balance; }
+.apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 44px 32px; border-top: 2px solid var(--ink); padding-top: 24px; }
+.app { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.shot { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #eef2f5; }
+.name { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+h2 { font-size: 30px; font-weight: 700; letter-spacing: -.015em; }
+.plat { font-size: 13px; color: var(--muted); text-align: right; line-height: 1.4; }
+.plat em { font-style: normal; color: var(--faint); }
+.desc { color: var(--soft); max-width: 46ch; }
+.acts { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; margin-top: 2px; }
+.go { font-weight: 700; color: var(--accent); border-bottom: 2px solid currentColor; padding-bottom: 1px; }
+.soon { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+footer { margin-top: 56px; padding-block: 20px 32px; border-top: 1px solid var(--rule); font-size: 14px; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+footer a { color: var(--ink); text-decoration: underline; }
+
+/* Roomy stand-in until its screenshots exist: a phone with a photo grid, duplicates marked. */
+.phone { display: grid; place-items: center; }
+.dev { display: block; height: 86%; aspect-ratio: 9 / 19; border-radius: 22px; background: #0f1114; padding: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
+.scr { width: 100%; height: 100%; border-radius: 15px; background: #f7f8fa; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 26px 4px 4px; align-content: start; overflow: hidden; }
+.scr i { aspect-ratio: 1; border-radius: 2px; background: var(--c); position: relative; }
+.scr i.dup::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-radius: 50%; background: #2a78d6; border: 1.5px solid #fff; }
+
+@media (max-width: 560px) { h1 { font-size: 38px; padding-block: 44px 36px; } h2 { font-size: 26px; } }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <div class="top">
-      <h1>Mihrap</h1>
-      <button class="lang" id="lang" type="button">Türkçe</button>
+<div class="wrap">
+  <header class="top">
+    <span class="word">Mihrap</span>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" id="langEn" aria-pressed="true">EN</button><span>/</span><button type="button" id="langTr" aria-pressed="false">TR</button>
     </div>
-    <p class="intro" data-t="intro">Simple, private apps for everyday life.</p>
   </header>
 
-  <section class="apps">
-    <article class="app">
-      <div class="head">
-        <img class="icon" src="mihrap/icons/icon-192.png" width="64" height="64" alt="">
-        <div>
-          <h2>Mihrap</h2>
-          <p class="platforms" data-t="mihrapPlatforms">Web · Android · Windows · smart TV</p>
-        </div>
-      </div>
-      <p class="desc" data-t="mihrapDesc">Prayer times, the adhan on time and a reflection screen with Quran verses, hadith and the 99 Names.</p>
-      <div class="actions">
-        <a class="button" href="mihrap/" data-t="open">Open Mihrap</a>
-      </div>
-    </article>
+  <main>
+    <h1 data-t="lead">Simple, private apps for everyday life.</h1>
 
-    <article class="app">
-      <div class="head">
-        <div class="icon roomy-icon" aria-hidden="true">R</div>
-        <div>
-          <h2>Roomy</h2>
-          <p class="platforms">iPhone</p>
+    <section class="apps">
+      <article class="app">
+        <a href="mihrap/"><img class="shot" src="studio/mihrap-home.jpg" width="1200" height="675"
+          alt="Mihrap home screen: the six prayer times, a large clock and the Prophet's Mosque at dusk"></a>
+        <div class="name">
+          <h2>Mihrap</h2>
+          <p class="plat"><span data-t="mihrapPlat">Web · Android · Windows · smart TV</span><br><span data-t="mihrapSoon">iPhone <em>coming soon</em></span></p>
         </div>
-      </div>
-      <p class="desc" data-t="roomyDesc">Free up iPhone space privately — duplicates, similar photos, large videos, contacts. Everything stays on your iPhone.</p>
-      <div class="actions">
-        <span class="badge" data-t="soon">Coming soon to the App Store</span>
-        <a class="link" href="roomy/" data-t="support">Support &amp; privacy</a>
-      </div>
-    </article>
-  </section>
+        <p class="desc" data-t="mihrapDesc">Prayer times, the adhan on time and a reflection screen with Quran verses, hadith, words of wisdom and the 99 Names.</p>
+        <div class="acts"><a class="go" href="mihrap/" data-t="open">Open Mihrap →</a></div>
+      </article>
+
+      <article class="app">
+        <a href="roomy/" class="shot phone" aria-label="Roomy">
+          <span class="dev"><span class="scr">
+            <i style="--c:#c7d4e2"></i><i class="dup" style="--c:#c7d4e2"></i><i style="--c:#e2cfb8"></i>
+            <i style="--c:#b9d0bf"></i><i class="dup" style="--c:#b9d0bf"></i><i style="--c:#d8c3d6"></i>
+            <i style="--c:#cdd8e8"></i><i style="--c:#e6dccb"></i><i class="dup" style="--c:#e6dccb"></i>
+            <i style="--c:#c2cbd4"></i><i style="--c:#d9e3cf"></i><i style="--c:#e0c9c3"></i>
+          </span></span>
+        </a>
+        <div class="name">
+          <h2>Roomy</h2>
+          <p class="plat">iPhone<br><span data-t="roomySoon">Android <em>coming soon</em></span></p>
+        </div>
+        <p class="desc" data-t="roomyDesc">Free up iPhone space privately — duplicates, similar photos, large videos, contacts. Everything stays on your iPhone.</p>
+        <div class="acts"><span class="soon" data-t="soon">Coming soon to the App Store</span><a class="go" href="roomy/" data-t="support">Support &amp; privacy →</a></div>
+      </article>
+    </section>
+  </main>
 
   <footer>
-    <span data-t="contact">Contact:</span> <a href="mailto:mihrap@mihrap.uk">mihrap@mihrap.uk</a>
+    <span><span data-t="contact">Contact:</span> <a href="mailto:mihrap@mihrap.uk">mihrap@mihrap.uk</a></span>
+    <span>© 2026 Mihrap</span>
   </footer>
-</main>
+</div>
 <script>
   (function () {
     var TR = {
-      intro: "Gündelik hayat için sade ve gizliliğe saygılı uygulamalar.",
-      mihrapPlatforms: "Web · Android · Windows · akıllı TV",
-      mihrapDesc: "Namaz vakitleri, vaktinde ezan ve ayet, hadis ve Esmâ-ül Hüsnâ ile tefekkür ekranı.",
-      open: "Mihrap'ı aç",
-      roomyDesc: "iPhone'da yer açın, gizliliğiniz korunsun — kopyalar, benzer fotoğraflar, büyük videolar, kişiler. Her şey iPhone'unuzda kalır.",
+      lead: "Gündelik hayat için sade ve gizliliğe saygılı uygulamalar.",
+      mihrapPlat: "Web · Android · Windows · akıllı TV",
+      mihrapSoon: "iPhone <em>yakında</em>",
+      mihrapDesc: "Namaz vakitleri, vaktinde ezan ve ayet, hadis, özlü sözler ve Esmâ-ül Hüsnâ ile tefekkür ekranı.",
+      open: "Mihrap'ı aç →",
+      roomySoon: "Android <em>yakında</em>",
+      roomyDesc: "iPhone'da yer açın, gizliliğiniz korunsun: kopyalar, benzer fotoğraflar, büyük videolar, kişiler. Her şey iPhone'unuzda kalır.",
       soon: "Yakında App Store'da",
-      support: "Destek ve gizlilik",
+      support: "Destek ve gizlilik →",
       contact: "İletişim:"
     };
     var nodes = document.querySelectorAll("[data-t]"), EN = {};
     for (var i = 0; i < nodes.length; i++) EN[nodes[i].getAttribute("data-t")] = nodes[i].innerHTML;
+    var en = document.getElementById("langEn"), tr = document.getElementById("langTr");
     function apply(lang) {
       var t = lang === "tr" ? TR : EN;
       for (var i = 0; i < nodes.length; i++) nodes[i].innerHTML = t[nodes[i].getAttribute("data-t")];
       document.documentElement.lang = lang;
-      document.getElementById("lang").textContent = lang === "tr" ? "English" : "Türkçe";
+      en.setAttribute("aria-pressed", lang === "en" ? "true" : "false");
+      tr.setAttribute("aria-pressed", lang === "tr" ? "true" : "false");
       try { localStorage.setItem("studio_lang", lang); } catch (e) {}
     }
     var saved = null;
     try { saved = localStorage.getItem("studio_lang"); } catch (e) {}
     var lang = saved || ((navigator.language || "").toLowerCase().indexOf("tr") === 0 ? "tr" : "en");
     if (lang === "tr") apply("tr");
-    document.getElementById("lang").onclick = function () { apply(document.documentElement.lang === "tr" ? "en" : "tr"); };
+    en.onclick = function () { apply("en"); };
+    tr.onclick = function () { apply("tr"); };
   })();
 </script>
 </body>
