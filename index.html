@@ -1,35 +1,36 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Mihrap — Namaz vakitleri, ezan ve tefekkür ekranı</title>
-<meta name="description" content="Mihrap; namaz vakitlerini gösteren, vaktinde ezan okutan ve ayet, hadis ve Esmâ-ül Hüsnâ'dan oluşan tefekkür ekran koruyucusu olan ücretsiz bir uygulamadır. Akıllı TV, tablet, telefon ve bilgisayarda tarayıcıdan çalışır.">
+<title>Mihrap — Prayer times, adhan and a reflection screen</title>
+<meta name="description" content="Mihrap is a free prayer times app: Diyanet times or 14 calculation methods, the adhan on time and a reflection screensaver with Quran verses, hadith and the 99 Names. Runs in the browser on smart TVs, tablets, phones and computers, in 10 languages. Namaz vakitleri, ezan ve tefekkür ekranı.">
 <link rel="canonical" href="https://mihrap.uk/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Mihrap">
-<meta property="og:title" content="Mihrap — Namaz vakitleri, ezan ve tefekkür ekranı">
-<meta property="og:description" content="Namaz vakitleri, vaktinde ezan ve tefekkür ekran koruyucusu. Akıllı TV, tablet, telefon ve bilgisayarda tarayıcıdan çalışır.">
+<meta property="og:title" content="Mihrap — Prayer times, adhan and a reflection screen">
+<meta property="og:description" content="Prayer times, the adhan on time and a reflection screensaver. Runs in the browser on smart TVs, tablets, phones and computers.">
 <meta property="og:url" content="https://mihrap.uk/">
 <meta property="og:image" content="https://mihrap.uk/img/og.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:locale" content="tr_TR">
+<meta property="og:locale" content="en_GB">
+<meta property="og:locale:alternate" content="tr_TR">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"WebApplication","name":"Mihrap","url":"https://mihrap.uk/",
-"description":"Namaz vakitleri, vaktinde ezan ve tefekkür ekran koruyucusu. Akıllı TV, tablet, telefon ve bilgisayarda tarayıcıdan çalışır.",
-"applicationCategory":"LifestyleApplication","operatingSystem":"Web tarayıcısı","inLanguage":["tr","en","de","ar","fa","id","ms","zh","ur","hi"],
+"description":"Prayer times, the adhan on time and a reflection screensaver. Runs in the browser on smart TVs, tablets, phones and computers.",
+"applicationCategory":"LifestyleApplication","operatingSystem":"Web browser","inLanguage":["en","tr","de","ar","fa","id","ms","zh","ur","hi"],
 "image":"https://mihrap.uk/img/og.jpg","offers":{"@type":"Offer","price":"0","priceCurrency":"GBP"}}
 </script>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<meta name="theme-color" content="#faf1e1">
+<meta name="theme-color" content="#071a30">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Mihrap">
-<link rel="stylesheet" href="css/app.css?v=20">
+<link rel="stylesheet" href="css/app.css?v=21">
 </head>
 <body>
 <div id="frame">
@@ -102,26 +103,33 @@
 
   <!-- Start: one press unlocks sound in the TV browser -->
   <div id="start" class="layer">
-    <img class="startArt" src="img/mihrap.jpg" width="640" height="640" alt="Mihrap simgesi: mihrap kemeri">
-    <div class="startBox">
-      <h1 class="startLogo">Mihrap</h1>
-      <p class="startTagline" id="startTagline">Namaz vakitleri, ezan ve tefekkür ekranı</p>
+    <div class="startShade"></div>
+    <div class="startBox" id="startBox">
+      <div class="startHead">
+        <img class="startMark" src="img/mihrab-logo.png" width="132" height="145" alt="Mihrap logo: a mihrab arch">
+        <h1 class="startLogo">Mihrap</h1>
+      </div>
+      <p class="startTagline" id="startTagline">Prayer times, adhan and a reflection screen</p>
       <ul class="startFacts" id="startFacts">
-        <li>Diyanet vakitleri veya 14 hesaplama yöntemi</li>
-        <li>Vaktinde ezan; isteğe bağlı dua ve tesbihat</li>
-        <li>Tefekkür ekran koruyucusu: ayet, hadis ve Esmâ-ül Hüsnâ</li>
-        <li>Akıllı TV, tablet, telefon ve bilgisayarda; 10 dil</li>
+        <li>Diyanet times or 14 calculation methods</li>
+        <li>Adhan on time, with optional dua and tesbihat</li>
+        <li>Reflection screensaver: Quran verses, hadith and the 99 Names</li>
+        <li>Smart TV, tablet, phone and computer · 10 languages</li>
       </ul>
-      <button id="startButton" class="nav big primary">Başlat</button>
-      <div id="startHint"></div>
+      <div class="startRow">
+        <button id="startButton" class="nav">Start</button>
+        <div id="startHint">Press or tap once so the adhan can play with sound.</div>
+      </div>
     </div>
+    <button id="startLang" class="nav"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"></path></svg><span id="startLangName">English</span></button>
+    <div id="langMenu" class="hidden"></div>
   </div>
 </div>
 </div>
 
 <audio id="player" preload="none"></audio>
 <audio id="cue" preload="none"></audio>
-<script src="data/config.js?v=20"></script>
-<script src="js/app.js?v=20"></script>
+<script src="data/config.js?v=21"></script>
+<script src="js/app.js?v=21"></script>
 </body>
 </html>

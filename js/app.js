@@ -96,7 +96,7 @@
   function defaultLanguage() {
     var nav = String(navigator.language || navigator.userLanguage || "tr").toLowerCase().substring(0, 2);
     if (nav === "in") nav = "id";
-    return LANGS.indexOf(nav) >= 0 ? nav : "tr";
+    return "en"; // first visit: English; the start page and Settings switch languages
   }
   var settings = load("settings", null) || {};
   var DEFAULTS = { lang: defaultLanguage(), countryId: "", countryName: "", cityId: "", cityName: "", districtId: "", districtName: "",
@@ -1938,6 +1938,7 @@
   function isShown(id) { return $(id).className.indexOf("hidden") < 0; }
   function anyLayer() { for (var i = 0; i < LAYERS.length; ++i) if (isShown(LAYERS[i])) return LAYERS[i]; return ""; }
   function activeRoot() {
+    if (isShown("langMenu")) return $("langMenu");
     var layer = anyLayer();
     if (layer) return $(layer);
     if (isShown("settings")) return $("settings");
@@ -2024,7 +2025,8 @@
   }, true);
   function goBack() {
     var layer = anyLayer();
-    if (layer === "picker") closePicker();
+    if (isShown("langMenu")) closeLangMenu();
+    else if (layer === "picker") closePicker();
     else if (layer === "credits") { hide("credits"); focusFirst(); }
     else if (isShown("settings")) closeSettings(false);
     else if (isShown("home") && isShown("actionRow")) setMenuOpen(false);
@@ -2348,21 +2350,49 @@
   }
 
   // ------------------------------------------------------------------ language
-  var START_TR = null;
+  // Start page description (index.html holds the English text for search engines).
+  var START_TEXT = {"en": ["Prayer times, adhan and a reflection screen", "Diyanet times or 14 calculation methods", "Adhan on time, with optional dua and tesbihat", "Reflection screensaver: Quran verses, hadith and the 99 Names", "Smart TV, tablet, phone and computer · 10 languages"], "tr": ["Namaz vakitleri, ezan ve tefekkür ekranı", "Diyanet vakitleri veya 14 hesaplama yöntemi", "Vaktinde ezan; isteğe bağlı dua ve tesbihat", "Tefekkür ekran koruyucusu: ayet, hadis ve Esmâ-ül Hüsnâ", "Akıllı TV, tablet, telefon ve bilgisayar · 10 dil"], "de": ["Gebetszeiten, Adhan und ein Bildschirm zur Besinnung", "Diyanet-Zeiten oder 14 Berechnungsmethoden", "Adhan pünktlich, auf Wunsch mit Dua und Tesbihat", "Bildschirmschoner zur Besinnung: Koranverse, Hadithe und die 99 Namen", "Smart-TV, Tablet, Handy und Computer · 10 Sprachen"], "ar": ["مواقيت الصلاة والأذان وشاشة للتأمل", "مواقيت رئاسة الشؤون الدينية التركية أو 14 طريقة حساب", "الأذان في وقته، مع الدعاء والتسبيحات اختياريًا", "شاشة توقف للتأمل: آيات قرآنية وأحاديث وأسماء الله الحسنى", "تلفاز ذكي وجهاز لوحي وهاتف وحاسوب · 10 لغات"], "fa": ["اوقات نماز، اذان و صفحه‌ای برای تفکر", "اوقات دیانت ترکیه یا ۱۴ روش محاسبه", "اذان سر وقت، با دعا و تسبیحات اختیاری", "محافظ صفحه برای تفکر: آیات قرآن، احادیث و اسماء الحسنی", "تلویزیون هوشمند، تبلت، تلفن و رایانه · ۱۰ زبان"], "id": ["Waktu salat, azan, dan layar renungan", "Waktu Diyanet atau 14 metode perhitungan", "Azan tepat waktu, dengan doa dan tasbih opsional", "Screensaver renungan: ayat Al-Qur'an, hadis, dan Asmaul Husna", "Smart TV, tablet, ponsel, dan komputer · 10 bahasa"], "ms": ["Waktu solat, azan dan skrin renungan", "Waktu Diyanet atau 14 kaedah pengiraan", "Azan tepat pada waktunya, dengan doa dan tasbih pilihan", "Penyelamat skrin renungan: ayat al-Quran, hadis dan Asmaul Husna", "TV pintar, tablet, telefon dan komputer · 10 bahasa"], "zh": ["礼拜时间、宣礼与沉思屏幕", "土耳其宗教事务局时间或14种计算方法", "准时宣礼，可选都阿与赞念", "沉思屏保：古兰经文、圣训与真主九十九尊名", "智能电视、平板、手机和电脑 · 10种语言"], "ur": ["نماز کے اوقات، اذان اور غور و فکر کی اسکرین", "دیانت کے اوقات یا 14 حسابی طریقے", "وقت پر اذان، اختیاری دعا اور تسبیحات کے ساتھ", "غور و فکر کا اسکرین سیور: قرآنی آیات، احادیث اور اسمائے حسنیٰ", "اسمارٹ ٹی وی، ٹیبلٹ، فون اور کمپیوٹر · 10 زبانیں"], "hi": ["नमाज़ के समय, अज़ान और चिंतन स्क्रीन", "दियानत के समय या 14 गणना विधियाँ", "समय पर अज़ान, वैकल्पिक दुआ और तस्बीहात के साथ", "चिंतन स्क्रीनसेवर: क़ुरआन की आयतें, हदीस और अल्लाह के 99 नाम", "स्मार्ट टीवी, टैबलेट, फ़ोन और कंप्यूटर · 10 भाषाएँ"]};
   function applyLanguage() {
     document.documentElement.lang = settings.lang;
     $("startButton").innerHTML = escapeHtml(Wt(W_START));
     $("startHint").innerHTML = escapeHtml(Wt(W_HINT));
-    // The start page's description is written in Turkish in index.html (for search engines); English elsewhere.
-    if (!START_TR) START_TR = [$("startTagline").innerHTML, $("startFacts").innerHTML];
-    var en = settings.lang !== "tr";
-    $("startTagline").innerHTML = en ? "Prayer times, adhan and reflection screen" : START_TR[0];
-    $("startFacts").innerHTML = en ? "<li>Diyanet times or 14 calculation methods</li><li>Adhan on time; optional dua and tesbihat</li>" +
-      "<li>Reflection screensaver: Quran verses, hadith and the 99 Names</li><li>Smart TV, tablet, phone and computer; 10 languages</li>" : START_TR[1];
+    var st = START_TEXT[settings.lang] || START_TEXT.en;
+    $("startTagline").innerHTML = escapeHtml(st[0]);
+    $("startFacts").innerHTML = "<li>" + escapeHtml(st[1]) + "</li><li>" + escapeHtml(st[2]) + "</li><li>" + escapeHtml(st[3]) + "</li><li>" + escapeHtml(st[4]) + "</li>";
+    $("startBox").setAttribute("dir", RTL[settings.lang] ? "rtl" : "ltr");
+    $("startLangName").innerHTML = escapeHtml(LANG_NAMES[settings.lang] || "English");
     $("lblAdhan").innerHTML = escapeHtml(S("ezan_oku"));
     $("lblSettings").innerHTML = escapeHtml(S("settings"));
     $("lblClose").innerHTML = escapeHtml(S("kapat"));
     $("eventOverlay").setAttribute("dir", RTL[settings.lang] ? "rtl" : "ltr");
+  }
+
+  // Start page language menu: the choice is saved like the Settings language.
+  function openLangMenu() {
+    var menu = $("langMenu"), current = null;
+    menu.innerHTML = "";
+    for (var i = 0; i < LANGS.length; ++i) {
+      (function (code) {
+        var b = document.createElement("button");
+        b.className = "nav" + (code === settings.lang ? " on" : "");
+        b.appendChild(document.createTextNode(LANG_NAMES[code]));
+        b.onclick = function () {
+          settings.lang = code;
+          if (settings.saverLangs && settings.saverLangs.indexOf(code) >= 0) settings.saverLangs.splice(settings.saverLangs.indexOf(code), 1);
+          store("settings", settings);
+          applyLanguage();
+          closeLangMenu();
+        };
+        if (code === settings.lang) current = b;
+        menu.appendChild(b);
+      })(LANGS[i]);
+    }
+    show("langMenu");
+    focusFirst(current);
+  }
+  function closeLangMenu() {
+    hide("langMenu");
+    $("startLang").focus();
   }
 
   // ------------------------------------------------------------------ start and main loop
@@ -2424,6 +2454,7 @@
     $("icAdhan").innerHTML = iconSvg(DATA.icons.adhan);
     $("icSettings").innerHTML = iconSvg(DATA.icons.settings);
     $("startButton").onclick = begin;
+    $("startLang").onclick = function () { if (isShown("langMenu")) closeLangMenu(); else openLangMenu(); };
     $("menuToggle").onclick = function () { setMenuOpen(!isShown("actionRow")); };
     $("actAdhan").onclick = function () { hide("actionRow"); toggleAdhan(); };
     $("actSettings").onclick = function () { hide("actionRow"); openSettings(); };

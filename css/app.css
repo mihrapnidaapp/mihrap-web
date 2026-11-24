@@ -107,13 +107,29 @@ button { font-family: inherit; }
 #closeCredits { position: absolute; left: 40px; top: 860px; }
 
 /* ---------- Start ---------- */
-#start { background: #faf1e1; color: #4a4236; }
-.startArt { position: absolute; left: 170px; top: 220px; width: 640px; height: 640px; }
-.startBox { position: absolute; left: 900px; top: 190px; width: 900px; text-align: left; }
-.startLogo { font-family: "Amiri", Georgia, serif; font-weight: normal; font-size: 150px; line-height: 1.1; color: #12294a; margin: 0; }
-.startTagline { font-size: 44px; color: #4a4236; margin: 6px 0 34px; }
-.startFacts { list-style: none; margin: 0 0 50px; padding: 0; font-size: 32px; color: #5a5040; }
-.startFacts li { position: relative; padding-left: 40px; margin-bottom: 14px; }
-.startFacts li:before { content: ""; position: absolute; left: 4px; top: 15px; width: 14px; height: 14px; background: #4fa8a0; transform: rotate(45deg); }
-#startButton { font-size: 56px; padding: 26px 90px; background: #12294a; border-color: #12294a; color: #faf1e1; }
-#startHint { font-size: 30px; margin-top: 34px; color: #7a6e5a; }
+#start { background: #071a30 url(../home/photo0.jpg) center 60% / cover no-repeat; color: #faf1e1; }
+.startShade { position: absolute; left: 0; top: 0; bottom: 0; width: 1140px;
+  background: linear-gradient(90deg, rgba(7,26,48,.94) 0%, rgba(7,26,48,.86) 55%, rgba(7,26,48,0) 100%); }
+.startBox { position: absolute; left: 120px; top: 138px; width: 900px; text-align: start; }
+.startHead { display: flex; align-items: center; }
+.startMark { width: 132px; height: 145px; margin: 0 33px 0 0; }
+[dir=rtl] .startMark { margin: 0 0 0 33px; }
+.startLogo { font-family: "Amiri", Georgia, serif; font-weight: normal; font-size: 144px; line-height: 1; color: #faf1e1; margin: 0; }
+.startTagline { font-size: 37px; color: #e5d5b8; margin: 33px 0 45px; }
+.startFacts { list-style: none; margin: 0; padding: 0; font-size: 27px; color: #dfe5ec; }
+.startFacts li { position: relative; padding: 0 0 0 34px; margin-bottom: 18px; }
+.startFacts li:before { content: ""; position: absolute; left: 2px; top: 13px; width: 13px; height: 13px; background: #4fa8a0; transform: rotate(45deg); }
+[dir=rtl] .startFacts li { padding: 0 34px 0 0; }
+[dir=rtl] .startFacts li:before { left: auto; right: 2px; }
+.startRow { display: flex; align-items: center; margin-top: 66px; }
+#startButton { font-size: 39px; height: 96px; padding: 0 84px; border-radius: 48px; border: 0; background: #d4a94a; color: #071a30; font-weight: 500; }
+#startHint { font-size: 22px; line-height: 1.4; color: #c9d2dc; max-width: 400px; margin: 0 0 0 36px; }
+[dir=rtl] #startHint { margin: 0 36px 0 0; }
+#startLang { position: absolute; top: 36px; right: 42px; display: flex; align-items: center; height: 66px; padding: 0 24px; border-radius: 33px;
+  border: 1px solid rgba(250,241,225,.5); background: rgba(7,26,48,.45); color: #faf1e1; font-size: 24px; }
+#startLang svg { margin-right: 12px; }
+#langMenu { position: absolute; top: 116px; right: 42px; width: 380px; padding: 12px; border-radius: 18px; background: rgba(7,26,48,.97);
+  box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+#langMenu .nav { display: block; width: 100%; text-align: left; font-size: 26px; padding: 12px 20px; margin: 0 0 4px; border: 0; border-radius: 10px;
+  background: transparent; color: #faf1e1; }
+#langMenu .nav.on { background: rgba(212,169,74,.22); color: #f1d48c; }
