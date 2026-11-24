@@ -43,8 +43,8 @@
 
   // Web-only texts (the rest come from the Android string resources).
   var WEB = {
-    tr: ["Başlat", "Ezan sesinin çalabilmesi için kumandayla bir kez basın.", "Kapalı", "Görsel kaynakları", "Açık", "Kapalı", "Ekran koruyucu süresi", "Ayarları sıfırla", "Emin misiniz? Tekrar basın"],
-    en: ["Start", "Press once with the remote so the adhan can play.", "Off", "Image credits", "On", "Off", "Screensaver after", "Reset settings", "Are you sure? Press again"],
+    tr: ["Başlat", "Ezanın sesli çalabilmesi için bir kez basın veya dokunun.", "Kapalı", "Görsel kaynakları", "Açık", "Kapalı", "Ekran koruyucu süresi", "Ayarları sıfırla", "Emin misiniz? Tekrar basın"],
+    en: ["Start", "Press or tap once so the adhan can play with sound.", "Off", "Image credits", "On", "Off", "Screensaver after", "Reset settings", "Are you sure? Press again"],
     de: ["Starten", "Einmal mit der Fernbedienung drücken, damit der Adhan abgespielt werden kann.", "Aus", "Bildnachweise", "An", "Aus", "Bildschirmschoner nach", "Einstellungen zurücksetzen", "Sicher? Nochmals drücken"],
     ar: ["ابدأ", "اضغط مرة واحدة بجهاز التحكم ليتمكن الأذان من العمل.", "إيقاف", "مصادر الصور", "تشغيل", "إيقاف", "شاشة التوقف بعد", "إعادة ضبط الإعدادات", "هل أنت متأكد؟ اضغط مرة أخرى"],
     fa: ["شروع", "یک بار با کنترل فشار دهید تا اذان پخش شود.", "خاموش", "منابع تصاویر", "روشن", "خاموش", "محافظ صفحه پس از", "بازنشانی تنظیمات", "مطمئن هستید؟ دوباره فشار دهید"],
@@ -234,7 +234,15 @@
     list.push(DATA.audio.tesbihat["ismi_azam_" + set], DATA.audio.tesbihat["tercumani_ismi_azam_" + set]);
     return list;
   }
+  // iPhone / iPad / Mac Safari: WebKit stops (and may crash the page) when a service worker
+  // answers audio byte ranges, so there the recordings stream from the site (sw.js skips them too).
+  var APPLE_WEBKIT = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (/Macintosh/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent));
   function cacheAudio() {
+    if (APPLE_WEBKIT) {
+      if (window.caches) try { caches["delete"](AUDIO_CACHE).then(function () { }, function () { }); } catch (e) { }
+      return;
+    }
     if (cachingAudio || !window.caches || !window.fetch || navigator.onLine === false) return;
     cachingAudio = true;
     var wanted = wantedAudio(), wantedAbs = {};
@@ -2340,10 +2348,17 @@
   }
 
   // ------------------------------------------------------------------ language
+  var START_TR = null;
   function applyLanguage() {
     document.documentElement.lang = settings.lang;
     $("startButton").innerHTML = escapeHtml(Wt(W_START));
     $("startHint").innerHTML = escapeHtml(Wt(W_HINT));
+    // The start page's description is written in Turkish in index.html (for search engines); English elsewhere.
+    if (!START_TR) START_TR = [$("startTagline").innerHTML, $("startFacts").innerHTML];
+    var en = settings.lang !== "tr";
+    $("startTagline").innerHTML = en ? "Prayer times, adhan and reflection screen" : START_TR[0];
+    $("startFacts").innerHTML = en ? "<li>Diyanet times or 14 calculation methods</li><li>Adhan on time; optional dua and tesbihat</li>" +
+      "<li>Reflection screensaver: Quran verses, hadith and the 99 Names</li><li>Smart TV, tablet, phone and computer; 10 languages</li>" : START_TR[1];
     $("lblAdhan").innerHTML = escapeHtml(S("ezan_oku"));
     $("lblSettings").innerHTML = escapeHtml(S("settings"));
     $("lblClose").innerHTML = escapeHtml(S("kapat"));

@@ -3,15 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Mihrap</title>
+<title>Mihrap — Namaz vakitleri, ezan ve tefekkür ekranı</title>
+<meta name="description" content="Mihrap; namaz vakitlerini gösteren, vaktinde ezan okutan ve ayet, hadis ve Esmâ-ül Hüsnâ'dan oluşan tefekkür ekran koruyucusu olan ücretsiz bir uygulamadır. Akıllı TV, tablet, telefon ve bilgisayarda tarayıcıdan çalışır.">
+<link rel="canonical" href="https://mihrap.uk/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Mihrap">
+<meta property="og:title" content="Mihrap — Namaz vakitleri, ezan ve tefekkür ekranı">
+<meta property="og:description" content="Namaz vakitleri, vaktinde ezan ve tefekkür ekran koruyucusu. Akıllı TV, tablet, telefon ve bilgisayarda tarayıcıdan çalışır.">
+<meta property="og:url" content="https://mihrap.uk/">
+<meta property="og:image" content="https://mihrap.uk/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="tr_TR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"Mihrap","url":"https://mihrap.uk/",
+"description":"Namaz vakitleri, vaktinde ezan ve tefekkür ekran koruyucusu. Akıllı TV, tablet, telefon ve bilgisayarda tarayıcıdan çalışır.",
+"applicationCategory":"LifestyleApplication","operatingSystem":"Web tarayıcısı","inLanguage":["tr","en","de","ar","fa","id","ms","zh","ur","hi"],
+"image":"https://mihrap.uk/img/og.jpg","offers":{"@type":"Offer","price":"0","priceCurrency":"GBP"}}
+</script>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<meta name="theme-color" content="#0f3a31">
+<meta name="theme-color" content="#faf1e1">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Mihrap">
-<link rel="stylesheet" href="css/app.css?v=18">
+<link rel="stylesheet" href="css/app.css?v=20">
 </head>
 <body>
 <div id="frame">
@@ -84,8 +102,16 @@
 
   <!-- Start: one press unlocks sound in the TV browser -->
   <div id="start" class="layer">
+    <img class="startArt" src="img/mihrap.jpg" width="640" height="640" alt="Mihrap simgesi: mihrap kemeri">
     <div class="startBox">
-      <div class="startLogo">Mihrap</div>
+      <h1 class="startLogo">Mihrap</h1>
+      <p class="startTagline" id="startTagline">Namaz vakitleri, ezan ve tefekkür ekranı</p>
+      <ul class="startFacts" id="startFacts">
+        <li>Diyanet vakitleri veya 14 hesaplama yöntemi</li>
+        <li>Vaktinde ezan; isteğe bağlı dua ve tesbihat</li>
+        <li>Tefekkür ekran koruyucusu: ayet, hadis ve Esmâ-ül Hüsnâ</li>
+        <li>Akıllı TV, tablet, telefon ve bilgisayarda; 10 dil</li>
+      </ul>
       <button id="startButton" class="nav big primary">Başlat</button>
       <div id="startHint"></div>
     </div>
@@ -95,7 +121,7 @@
 
 <audio id="player" preload="none"></audio>
 <audio id="cue" preload="none"></audio>
-<script src="data/config.js?v=18"></script>
-<script src="js/app.js?v=18"></script>
+<script src="data/config.js?v=20"></script>
+<script src="js/app.js?v=20"></script>
 </body>
 </html>

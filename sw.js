@@ -5,11 +5,15 @@
  * - Slides, fonts, home photos and icons are kept once loaded (cache first).
  * - Audio: the page stores the chosen adhan set, dua, reminder and tesbihat recordings in
  *   AUDIO; they are served from there (byte ranges answered by slicing) so the adhan plays
- *   offline. Recordings not stored yet come from the network as before.
+ *   offline. Recordings not stored yet come from the network as before. On Apple WebKit
+ *   (iPhone, iPad, Mac Safari) audio is left to the browser: serving it from here stops playback.
  * - Other sites (prayer-time APIs, adhan photos) are not touched.
  */
 var CACHE = "mihrap-v1";
 var AUDIO = "mihrap-audio-v1";
+var UA = self.navigator ? self.navigator.userAgent : "";
+var APPLE_WEBKIT = /iPhone|iPad|iPod/.test(UA) ||
+  (/Macintosh/.test(UA) && /Safari/.test(UA) && !/Chrome|Chromium|Edg|Firefox/.test(UA));
 
 self.addEventListener("install", function (event) {
   event.waitUntil(caches.open(CACHE).then(function (cache) {
@@ -58,6 +62,7 @@ self.addEventListener("fetch", function (event) {
   var url = new URL(request.url);
   if (url.origin !== self.location.origin) return;            // APIs and adhan photos: untouched
   if (url.pathname.indexOf("/audio/") >= 0) {
+    if (APPLE_WEBKIT) return;                                 // Safari streams audio itself (see app.js)
     event.respondWith(audioResponse(request));
     return;
   }
