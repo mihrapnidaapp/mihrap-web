@@ -121,13 +121,23 @@
   function fitStage() {
     var stage = $("stage");
     var frame = $("frame");
-    var w = (frame && frame.clientWidth) || window.innerWidth || document.documentElement.clientWidth;
-    var h = (frame && frame.clientHeight) || window.innerHeight || document.documentElement.clientHeight;
+    // iPhone/iPad report the new size a moment after rotating, so read the frame's box now and
+    // fit again shortly after (see refitSoon).
+    var box = frame && frame.getBoundingClientRect ? frame.getBoundingClientRect() : null;
+    var w = (box && box.width) || (frame && frame.clientWidth) || window.innerWidth || document.documentElement.clientWidth;
+    var h = (box && box.height) || (frame && frame.clientHeight) || window.innerHeight || document.documentElement.clientHeight;
     var scale = Math.min(w / W, h / H);
     var left = Math.round((w - W * scale) / 2), top = Math.round((h - H * scale) / 2);
     var t = "translate(" + left + "px," + top + "px) scale(" + scale + ")";
     stage.style.webkitTransform = t;
     stage.style.transform = t;
+  }
+
+  var refitTimers = [];
+  function refitSoon() {
+    fitStage();
+    for (var i = 0; i < refitTimers.length; ++i) clearTimeout(refitTimers[i]);
+    refitTimers = [setTimeout(fitStage, 150), setTimeout(fitStage, 400), setTimeout(fitStage, 900)];
   }
 
   // ------------------------------------------------------------------ prayer times (PrayerApi)
@@ -2449,7 +2459,18 @@
 
   function init() {
     fitStage();
-    window.addEventListener("resize", fitStage);
+    window.addEventListener("resize", refitSoon);
+    window.addEventListener("orientationchange", refitSoon);
+    window.addEventListener("pageshow", refitSoon);
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", refitSoon);
+    // On a phone the whole start page is small; a tap anywhere on it (outside the language
+    // button and menu) starts, like the Start button.
+    $("start").addEventListener("click", function (e) {
+      var t = e.target;
+      while (t && t !== this) { if (t.id === "startLang" || t.id === "langMenu" || t.id === "startButton") return; t = t.parentNode; }
+      if (isShown("langMenu")) { closeLangMenu(); return; }
+      begin();
+    });
     applyLanguage();
     $("icAdhan").innerHTML = iconSvg(DATA.icons.adhan);
     $("icSettings").innerHTML = iconSvg(DATA.icons.settings);
